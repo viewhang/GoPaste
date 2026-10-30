@@ -138,7 +138,7 @@ func (a *App) barCard(c *ui.Context, r *types.Record, i int) {
 	if sel && !a.preview {
 		card.Bind(&a.pasteAnchor)
 	}
-	card.Border(2, p.border)
+	card.Border(2, p.hair)
 	if a.settings.Theme == themeGlass {
 		card.BorderWidth(1)
 	}

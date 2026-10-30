@@ -112,11 +112,11 @@ func settingRow(c *ui.Context, p palette, title, desc string, control func()) {
 	})
 }
 
-// card 使用容器背景绘制设置分组并保留各主题的边框样式
+// card 按主题绘制设置分组的容器背景与弱描边
 func (a *App) card(c *ui.Context, p palette) ui.Element {
 	e := ui.Column(c).Padding(14, 16).Gap(13).Radius(11).Background(p.surface)
 	if a.settings.Theme != themeGlass {
-		e.Border(1, p.border)
+		e.Border(1, p.hair)
 	}
 	return e
 }

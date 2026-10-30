@@ -236,8 +236,15 @@ func TestDragToManualLists(t *testing.T) {
 	}
 }
 
-// TestSmartLists 验证智能列表的规则编辑、匹配方式切换、新记录收录与持久化
+// TestSmartLists 验证两种主题中智能列表的规则编辑、取消与持久化
 func TestSmartLists(t *testing.T) {
+	for _, theme := range []int{themeClassic, themeGlass} {
+		t.Run(fmt.Sprintf("theme-%d", theme), func(t *testing.T) { testSmartLists(t, theme) })
+	}
+}
+
+// testSmartLists 验证指定主题中的智能列表表单与匹配结果
+func testSmartLists(t *testing.T, theme int) {
 	st, err := store.Open(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -253,6 +260,7 @@ func TestSmartLists(t *testing.T) {
 	a := NewApp()
 	a.st, a.form = st, formPanel
 	a.reload()
+	a.settings.Theme = theme
 	tt := ui.NewTester(a.view, panelWidth, panelHeight)
 	// click 点击规则表单中的控件
 	click := func(label string) {

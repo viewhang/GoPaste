@@ -33,18 +33,20 @@ type palette struct {
 	success    ui.Color
 }
 
-// pal 按系统明暗外观提供容器、文字、交互与状态颜色
+// pal 按系统明暗外观提供容器、边界、三级文字与交互状态颜色
 func pal(c *ui.Context) palette {
 	p := palette{}
 	if c.Theme().Dark {
 		p.bg = ui.Hex("#1c1c1e")
 		p.chrome = ui.Hex("#222225")
-		p.surface = ui.Hex("#242426")
+		p.surface = ui.Hex("#29292c")
 		p.hover = ui.Hex("#303034")
 		p.border = ui.Hex("#3c3c43")
+		p.hair = ui.Hex("#35353b")
 		p.shadow = ui.RGBA(0, 0, 0, 0.5)
 		p.text = ui.Hex("#f2f2f5")
 		p.muted = ui.Hex("#b0b0b9")
+		p.faint = ui.Hex("#9e9ea8")
 		p.accent = ui.Hex("#6cb6ff")
 		p.accentText = ui.Hex("#101828")
 		p.accentSoft = ui.Hex("#24364d")
@@ -57,17 +59,19 @@ func pal(c *ui.Context) palette {
 		p.surface = ui.Hex("#ffffff")
 		p.hover = ui.Hex("#eaecef")
 		p.border = ui.Hex("#dadae0")
+		p.hair = ui.Hex("#e3e4e8")
 		p.shadow = ui.RGBA(0, 0, 0, 0.16)
 		p.text = ui.Hex("#202124")
-		p.muted = ui.Hex("#63666f")
-		p.accent = ui.Hex("#006adc")
+		p.muted = ui.Hex("#575b65")
+		p.faint = ui.Hex("#666a73")
+		p.accent = ui.Hex("#0066d6")
 		p.accentText = ui.Hex("#ffffff")
 		p.accentSoft = ui.Hex("#e6effb")
 		p.danger = ui.Hex("#c73532")
 		p.warning = ui.Hex("#8a5c13")
 		p.success = ui.Hex("#247647")
 	}
-	p.raised, p.hair, p.faint = p.hover, p.border, p.muted
+	p.raised = p.hover
 	p.accentLine = p.accent
 	return p
 }

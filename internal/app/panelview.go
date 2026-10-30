@@ -27,6 +27,8 @@ func (a *App) panelView(c *ui.Context, p palette) {
 		if a.settings.Theme == themeGlass && !a.preview {
 			ui.Box(c).Grow(1).Children(func() {
 				a.listPane(c, p)
+				ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(glassHeaderHeight + 10).
+					PassThrough().Material(glass.ScrollEdge{Background: p.bg})
 				ui.Column(c).Absolute().Top(0).Left(0).Right(0).PassThrough().Children(func() {
 					a.panelHeader(c, p)
 				})
@@ -43,12 +45,11 @@ func (a *App) panelView(c *ui.Context, p palette) {
 	})
 }
 
-// panelHeader 按主题将搜索与列表分组绘制为统一顶栏
+// panelHeader 按主题将搜索与列表分组绘制为普通或中性玻璃顶栏
 func (a *App) panelHeader(c *ui.Context, p palette) {
 	header := ui.Column(c)
 	if a.settings.Theme == themeGlass {
-		header.Height(glassHeaderHeight).PassThrough().Material(glass.Glass{Tint: p.chrome.Alpha(0.6)})
-		header.BorderWidth(0, 0, 1, 0).BorderColor(p.hair)
+		header.Height(glassHeaderHeight).PassThrough().Material(glass.Glass{})
 	} else {
 		header.Background(p.chrome)
 	}
@@ -114,7 +115,7 @@ func (a *App) settingsButton(c *ui.Context, p palette) {
 	})
 }
 
-// searchBox 绘制自动聚焦的搜索框并处理搜索、删除、预览、粘贴与长条导航
+// searchBox 绘制自动聚焦且保持中性边框的搜索框并处理搜索、删除、预览、粘贴与长条导航
 func (a *App) searchBox(c *ui.Context, p palette, compact bool) {
 	box := ui.Row(c).Gap(6).AlignItems(ui.Center).Radius(8).Padding(0, 8).Background(p.surface)
 	box.Border(1, p.border)
@@ -124,13 +125,10 @@ func (a *App) searchBox(c *ui.Context, p palette, compact bool) {
 		box.Grow(1).Height(32)
 	}
 	if a.settings.Theme == themeGlass {
-		box.Radius(10).BorderColor(p.hair)
+		box.Radius(10).Background(p.surface.Mix(p.bg, 0.4)).BorderColor(p.hair)
 		if !compact {
 			box.Height(38)
 		}
-	}
-	if a.search.Focused(c) {
-		box.Border(1, p.accentLine)
 	}
 	box.Children(func() {
 		ui.Icon(c, icoSearch).Size(13, 13).TextColor(p.faint)

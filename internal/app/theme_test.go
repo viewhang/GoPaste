@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 
@@ -105,6 +106,56 @@ func TestThemedControls(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// TestGlassSegmentedAnimation 验证不同宽度选项的滑块过渡、控件独立性与减少动态效果设置
+func TestGlassSegmentedAnimation(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dark-%v", dark), func(t *testing.T) {
+			a := NewApp()
+			a.settings.Theme = themeGlass
+			first, second := 0, 0
+			tt := ui.NewTester(func(c *ui.Context) {
+				a.applyTheme(c)
+				c.Root().Background(c.Theme().Background)
+				ui.Column(c).Padding(12).Gap(12).Children(func() {
+					a.themeSegmented(c, &first, "短", "较长的选项", "末项").Label("第一组")
+					a.themeSegmented(c, &second, "独立选项", "第二组末项").Label("第二组")
+				})
+			}, 360, 120)
+			tt.SetDark(dark)
+			// snapshot 提取指定分段控件的像素以比较滑块位置
+			snapshot := func(label string) []byte {
+				t.Helper()
+				r, ok := tt.Find(label)
+				if !ok {
+					t.Fatalf("未显示分段控件 %s", label)
+				}
+				crop := image.NewRGBA(image.Rect(0, 0, int(r.W), int(r.H)))
+				draw.Draw(crop, crop.Bounds(), tt.Image(), image.Pt(int(r.X), int(r.Y)), draw.Src)
+				return crop.Pix
+			}
+			initial, independent := snapshot("第一组"), snapshot("第二组")
+			first = 1
+			tt.Frame()
+			tt.Advance(70 * time.Millisecond)
+			middle := snapshot("第一组")
+			tt.Advance(140 * time.Millisecond)
+			end := snapshot("第一组")
+			if bytes.Equal(initial, middle) || bytes.Equal(middle, end) || bytes.Equal(initial, end) {
+				t.Fatal("滑块未经过中间位置移动至不同宽度的选项")
+			}
+			if !bytes.Equal(independent, snapshot("第二组")) {
+				t.Fatal("第一组的动画影响了独立分段控件")
+			}
+			tt.SetPreferences(ui.Preferences{ReduceMotion: true})
+			first = 0
+			tt.Frame()
+			if !bytes.Equal(initial, snapshot("第一组")) {
+				t.Fatal("减少动态效果时滑块未立即回到首项")
+			}
+		})
 	}
 }
 

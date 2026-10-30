@@ -17,7 +17,7 @@ type promptState struct {
 	tab    *types.Tab
 }
 
-// promptOverlay 在面板范围内显示可滚动的列表编辑表单
+// promptOverlay 在单层玻璃或普通容器中显示可滚动的列表编辑表单
 func (a *App) promptOverlay(c *ui.Context, p palette) {
 	ps := a.prompt
 	if ps == nil {
@@ -35,6 +35,9 @@ func (a *App) promptOverlay(c *ui.Context, p palette) {
 				Background(p.surface).Border(1, p.border)
 			card.Shadow(0, 12, 34, 0, p.shadow)
 			a.themeSurface(card, p.surface, false)
+			if a.settings.Theme == themeGlass {
+				card.BorderColor(ui.Transparent)
+			}
 			card.Children(func() {
 				ui.Text(c, ps.title()).FontSize(13).Bold().TextColor(p.text)
 				ui.Scroll(c).Shrink(1).MaxHeight(h - 126).Children(func() {
@@ -53,10 +56,10 @@ func (a *App) promptOverlay(c *ui.Context, p palette) {
 					ui.Text(c, ps.err).FontSize(11).TextColor(p.danger)
 				}
 				ui.Row(c).Gap(7).Justify(ui.End).Children(func() {
-					if a.themeButton(c, locales.Cancel()).Clicked() {
+					if ui.Button(c, locales.Cancel()).Clicked() {
 						a.prompt = nil
 					}
-					if a.themePrimaryButton(c, ps.okText()).Clicked() {
+					if ui.PrimaryButton(c, ps.okText()).Clicked() {
 						a.acceptPrompt()
 					}
 				})

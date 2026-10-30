@@ -42,10 +42,17 @@ func (a *App) themeBackground(c *ui.Context, e ui.Element, p palette) {
 	}
 }
 
-// themeSurface 按主题绘制控件材质并为可点击的玻璃控件启用按压反馈
+// themeSurface 按主题绘制中性玻璃表面并为操作控件提供悬停与按压反馈
 func (a *App) themeSurface(e ui.Element, background ui.Color, interactive bool) ui.Element {
 	if a.settings.Theme == themeGlass {
-		return e.Material(glass.Glass{Tint: background.Alpha(0.35), Interactive: interactive})
+		tint := background.Alpha(0.35)
+		if interactive {
+			tint = ui.Transparent
+			if e.Hovered() {
+				tint = background.Alpha(0.12)
+			}
+		}
+		return e.Material(glass.Glass{Tint: tint, Interactive: interactive})
 	}
 	return e.Background(background)
 }
@@ -77,7 +84,11 @@ func (a *App) themeSwitch(c *ui.Context, on *bool) ui.Element {
 
 // themeButton 按主题绘制普通操作按钮并保留框架的点击和禁用行为
 func (a *App) themeButton(c *ui.Context, label string) ui.Element {
-	return a.themeSurface(ui.Button(c, label), c.Theme().Surface, true)
+	button := ui.Button(c, label)
+	if a.settings.Theme == themeGlass {
+		button.BorderColor(ui.Transparent)
+	}
+	return a.themeSurface(button, c.Theme().Surface, true)
 }
 
 // themePrimaryButton 按主题绘制带强调色的主要操作按钮
@@ -89,22 +100,23 @@ func (a *App) themePrimaryButton(c *ui.Context, label string) ui.Element {
 	return button
 }
 
-// themeTextInput 按主题绘制文本输入框并保留编辑、提交与焦点行为
+// themeTextInput 按主题绘制轻填充输入框并保留编辑、提交与焦点行为
 func (a *App) themeTextInput(c *ui.Context, value *string) ui.Element {
 	if a.settings.Theme != themeGlass {
 		return ui.TextInput(c, value)
 	}
 	t := c.Theme()
-	field := ui.TextInputBase(c, value).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.Radius).Border(1, t.Border)
-	a.themeSurface(field, t.Surface, false)
+	field := ui.TextInputBase(c, value).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.Radius).
+		Background(t.Surface.Mix(t.Background, 0.4)).Border(1, pal(c).hair)
 	if field.Focused() {
 		field.BorderColor(t.Focus)
 	} else if field.Hovered() {
-		field.BorderColor(t.Border.Mix(t.Text, 0.25))
+		field.BorderColor(t.Border)
 	}
 	return field
 }
 
+// numberInputState 保存数字输入框的编辑文本与已提交数值
 type numberInputState struct {
 	text  string
 	value float64
@@ -113,6 +125,10 @@ type numberInputState struct {
 // themeNumberInput 将数字输入与上下步进按钮绘制在同一个边框内并保留范围校验
 func (a *App) themeNumberInput(c *ui.Context, value *float64, lo, hi, step float64) ui.Element {
 	t := c.Theme()
+	background, border, hover := t.Surface, t.Border, t.Border.Mix(t.Text, 0.25)
+	if a.settings.Theme == themeGlass {
+		background, border, hover = t.Surface.Mix(t.Background, 0.4), pal(c).hair, t.Border
+	}
 	group := ui.Row(c).AlignItems(ui.Stretch).Width(t.Space(32)).Shrink(0).Role(ui.RoleGroup)
 	decimals := 0
 	if s := strconv.FormatFloat(step, 'f', -1, 64); strings.Contains(s, ".") {
@@ -138,12 +154,12 @@ func (a *App) themeNumberInput(c *ui.Context, value *float64, lo, hi, step float
 	group.Children(func() {
 		ui.Box(c).FillWidth().MinWidth(0).Children(func() {
 			input := ui.TextInputBase(c, &state.text).FillWidth().MinWidth(0).
-				Padding(t.Space(1.5), t.Space(6)+1, t.Space(1.5), t.Space(2.5)).Radius(t.Radius).Border(1, t.Border)
-			a.themeSurface(input, t.Surface, false)
+				Padding(t.Space(1.5), t.Space(6)+1, t.Space(1.5), t.Space(2.5)).Radius(t.Radius).
+				Background(background).Border(1, border)
 			if input.Focused() {
 				input.BorderColor(t.Focus)
 			} else if input.Hovered() {
-				input.BorderColor(t.Border.Mix(t.Text, 0.25))
+				input.BorderColor(hover)
 			}
 			if input.Changed() {
 				if v, err := strconv.ParseFloat(strings.TrimSpace(state.text), 64); err == nil && v >= lo && v <= hi {
@@ -162,7 +178,7 @@ func (a *App) themeNumberInput(c *ui.Context, value *float64, lo, hi, step float
 			input.Range(lo, hi, *value).Step(step)
 		})
 		ui.Row(c).Absolute().Top(1).Bottom(1).Right(1).Width(t.Space(3.5) + 1).AlignItems(ui.Stretch).Children(func() {
-			ui.Box(c).Width(1).Shrink(0).Background(t.Border)
+			ui.Box(c).Width(1).Shrink(0).Background(border)
 			ui.Column(c).FillWidth().Children(func() {
 				button := func(up bool) ui.Element {
 					b := ui.ButtonBase(c).FillWidth().Height(0).Grow(1).Padding(0)
@@ -195,7 +211,7 @@ func (a *App) themeNumberInput(c *ui.Context, value *float64, lo, hi, step float
 					return b
 				}
 				increase := button(true)
-				ui.Box(c).FillWidth().Height(1).Background(t.Border)
+				ui.Box(c).FillWidth().Height(1).Background(border)
 				decrease := button(false)
 				if increase.Clicked() {
 					advance(step)
@@ -210,7 +226,7 @@ func (a *App) themeNumberInput(c *ui.Context, value *float64, lo, hi, step float
 	return group
 }
 
-// themeSegmented 按主题绘制分段选择并复用框架的选择、键盘与无障碍行为
+// themeSegmented 按主题绘制分段选择与连续移动的玻璃滑块并保留键盘和无障碍行为
 func (a *App) themeSegmented(c *ui.Context, selected *int, labels ...string) ui.Element {
 	if a.settings.Theme != themeGlass {
 		return ui.Segmented(c, selected, labels...)
@@ -218,13 +234,32 @@ func (a *App) themeSegmented(c *ui.Context, selected *int, labels ...string) ui.
 	t := c.Theme()
 	parts := ui.SegmentedBase(c, selected, len(labels))
 	parts.Track.AlignItems(ui.Stretch).Padding(t.Space(0.5)).Gap(t.Space(0.5)).Radius(t.Radius).
-		Background(t.Surface).Border(1, t.Border)
+		Background(t.Background).Border(1, pal(c).hair)
+	offset, width := float32(0), float32(0)
+	for i, label := range labels {
+		w, _ := c.MeasureText(0, ui.Span{Text: label})
+		w += t.Space(6)
+		if i < *selected {
+			offset += w + t.Space(0.5)
+		} else if i == *selected {
+			width = w
+		}
+	}
+	offset = parts.Track.Animate("selection-offset", offset, 140*time.Millisecond)
+	width = parts.Track.Animate("selection-width", width, 140*time.Millisecond)
+	rtl := c.Direction() == ui.RightToLeft
+	parts.Track.Draw(func(p *ui.Painter, r ui.Rect) {
+		inset := t.Space(0.5) + 1
+		x := r.X + inset + offset
+		if rtl {
+			x = r.X + r.W - inset - offset - width
+		}
+		glass.Paint(p, ui.Rect{X: x, Y: r.Y + inset, W: width, H: r.H - inset*2}, t.Radius-t.Space(0.5), glass.Glass{})
+	})
 	parts.Track.Children(func() {
 		for i, label := range labels {
 			segment := parts.Segment(i).Padding(t.Space(1), t.Space(3)).Radius(t.Radius - t.Space(0.5))
-			if i == *selected {
-				segment.Material(glass.Glass{Interactive: true})
-			} else if segment.Hovered() {
+			if i != *selected && segment.Hovered() {
 				segment.Background(t.SurfaceHover)
 			}
 			segment.Children(func() { ui.Text(c, label).SingleLine() })
@@ -241,15 +276,18 @@ func (a *App) themeSelect(c *ui.Context, selected *string, options []string) ui.
 	t := c.Theme()
 	parts := ui.SelectBase(c, selected)
 	trigger := parts.Trigger.Padding(t.Space(1.5), t.Space(3.5)).Gap(t.Space(1.5)).Radius(t.Radius).
-		Justify(ui.SpaceBetween).MinWidth(t.Space(35)).Border(1, t.Border)
+		Justify(ui.SpaceBetween).MinWidth(t.Space(35)).Border(1, ui.Transparent)
 	a.themeSurface(trigger, t.Surface, true)
+	if trigger.Focused() {
+		trigger.BorderColor(t.Focus)
+	}
 	trigger.Children(func() {
 		ui.Text(c, *selected).SingleLine()
 		ui.Icon(c, icoChevron).Size(t.Space(2.5), t.Space(2.5)).TextColor(t.TextMuted)
 	})
 	parts.Popup(func(panel ui.Element) {
-		panel.Margin(t.Space(1), 0, 0).Padding(t.Space(1)).Radius(t.Radius+2).Border(1, t.Border).
-			Material(glass.Glass{Tint: t.Surface.Alpha(0.6)}).Shadow(0, 6, 20, 0, ui.RGBA(0, 0, 0, 0.18))
+		panel.Margin(t.Space(1), 0, 0).Padding(t.Space(1)).Radius(t.Radius+2).Border(1, ui.Transparent).
+			Material(glass.Glass{}).Shadow(0, 6, 20, 0, ui.RGBA(0, 0, 0, 0.18))
 		ui.Scroll(c).MaxHeight(240).Shrink(1).Children(func() {
 			for _, option := range options {
 				item := parts.Item(option).Padding(t.Space(1.5), t.Space(2.5)).Radius(t.Radius)
