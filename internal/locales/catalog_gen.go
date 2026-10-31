@@ -363,6 +363,14 @@ func (msgs Messages) ClassicTheme() string {
 	return Catalog.Format(msgs.locale, "classicTheme", nil)
 }
 
+// TransparentTheme 返回应用当前语言的透明主题名称
+func TransparentTheme() string { return In(i18n.Locale()).TransparentTheme() }
+
+// TransparentTheme 返回指定语言的透明主题名称
+func (msgs Messages) TransparentTheme() string {
+	return Catalog.Format(msgs.locale, "transparentTheme", nil)
+}
+
 // PanelForm says "面板形态"
 // in the language the app shows.
 func PanelForm() string { return In(i18n.Locale()).PanelForm() }

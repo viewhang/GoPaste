@@ -141,7 +141,7 @@ type Settings struct {
 	ExcludeWhitespace bool `json:"excludeWhitespace"`
 	// ImageLimitMiB 限制单张剪贴板图片的编码字节大小，0 表示不限制
 	ImageLimitMiB int `json:"imageLimitMiB"`
-	// Theme 保存外观主题，0 为经典，1 为 Liquid Glass
+	// Theme 保存外观主题，0 为经典，1 为透明
 	Theme int `json:"theme,omitempty"`
 	// Form is the panel's shape: 0 along the bottom of the screen, 1 beside
 	// the pointer.

@@ -35,6 +35,7 @@
   "theme": "主题",
   "themeSystemHint": "两种主题均跟随系统的深浅色。",
   "classicTheme": "经典",
+  "transparentTheme": "透明",
   "panelForm": "面板形态",
   "bottomBar": "贴底长条",
   "followPointer": "跟随鼠标",

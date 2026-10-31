@@ -131,7 +131,7 @@ func (a *App) settingsAppearance(c *ui.Context, p palette) {
 			ui.Divider(c)
 			theme := a.settings.Theme
 			settingRow(c, p, locales.Theme(), locales.ThemeSystemHint(), func() {
-				a.themeSegmented(c, &theme, locales.ClassicTheme(), "Liquid Glass").Label(locales.Theme())
+				a.themeSegmented(c, &theme, locales.ClassicTheme(), locales.TransparentTheme()).Label(locales.Theme())
 			})
 			if theme != a.settings.Theme {
 				a.setSetting(func(s *types.Settings) { s.Theme = theme })

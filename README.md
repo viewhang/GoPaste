@@ -13,7 +13,7 @@ A clipboard manager for macOS and Windows, built with Go and [MyGo](https://gith
 - Preview and drag items, and paste with formatting or as plain text
 - Choose which apps to exclude, and skip blank text, content marked confidential or images above a size limit
 - Use a resizable bottom bar or a panel that opens beside the cursor
-- Choose Classic or Liquid Glass, in English or Simplified Chinese
+- Choose Classic or Transparent, in English or Simplified Chinese
 
 ## MyGo
 

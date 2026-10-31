@@ -199,9 +199,9 @@ func TestThemeSwitchAndPersistence(t *testing.T) {
 		label string
 		theme int
 	}{
-		{label: "Liquid Glass", theme: themeGlass},
+		{label: "透明", theme: themeGlass},
 		{label: "经典", theme: themeClassic},
-		{label: "Liquid Glass", theme: themeGlass},
+		{label: "透明", theme: themeGlass},
 	} {
 		if err := settings.Click(choice.label); err != nil {
 			t.Fatal(err)
@@ -495,8 +495,8 @@ func TestGlassSettingsHeader(t *testing.T) {
 				if err := tt.Click("经典"); err != nil || a.settings.Theme != themeClassic {
 					t.Fatalf("设置页无法切回经典主题：%v", err)
 				}
-				if err := tt.Click("Liquid Glass"); err != nil || a.settings.Theme != themeGlass {
-					t.Fatalf("设置页无法切回玻璃主题：%v", err)
+				if err := tt.Click("透明"); err != nil || a.settings.Theme != themeGlass {
+					t.Fatalf("设置页无法切回透明主题：%v", err)
 				}
 			})
 		}

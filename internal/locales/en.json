@@ -35,6 +35,7 @@
   "theme": "Theme",
   "themeSystemHint": "Both themes follow the system appearance.",
   "classicTheme": "Classic",
+  "transparentTheme": "Transparent",
   "panelForm": "Panel Position",
   "bottomBar": "Bottom Bar",
   "followPointer": "Pointer Panel",
