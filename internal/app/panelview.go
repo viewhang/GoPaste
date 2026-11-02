@@ -125,7 +125,7 @@ func (a *App) searchBox(c *ui.Context, p palette, compact bool) {
 		box.Grow(1).Height(32)
 	}
 	if a.settings.Theme == themeGlass {
-		box.Radius(10).Background(p.surface.Mix(p.bg, 0.4)).BorderColor(p.hair)
+		box.Radius(10).Background(p.control).BorderColor(p.hair)
 		if !compact {
 			box.Height(38)
 		}

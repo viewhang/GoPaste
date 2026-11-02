@@ -34,7 +34,7 @@ func (a *App) promptOverlay(c *ui.Context, p palette) {
 			card := ui.Column(c).Key(ps).Width(min(420, w-24)).MaxHeight(h-16).Padding(16).Gap(11).Radius(12).
 				Background(p.surface).Border(1, p.border)
 			card.Shadow(0, 12, 34, 0, p.shadow)
-			a.themeSurface(card, p.surface, false)
+			a.themeSurface(card, p.surface)
 			if a.settings.Theme == themeGlass {
 				card.BorderColor(ui.Transparent)
 			}
@@ -56,7 +56,7 @@ func (a *App) promptOverlay(c *ui.Context, p palette) {
 					ui.Text(c, ps.err).FontSize(11).TextColor(p.danger)
 				}
 				ui.Row(c).Gap(7).Justify(ui.End).Children(func() {
-					if ui.Button(c, locales.Cancel()).Clicked() {
+					if a.themeButton(c, locales.Cancel()).Clicked() {
 						a.prompt = nil
 					}
 					if ui.PrimaryButton(c, ps.okText()).Clicked() {

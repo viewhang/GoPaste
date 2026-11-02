@@ -14,6 +14,8 @@ type palette struct {
 	bg      ui.Color
 	chrome  ui.Color
 	surface ui.Color
+	// control 统一透明主题表单控件的中性底色
+	control ui.Color
 	raised  ui.Color
 	hover   ui.Color
 	border  ui.Color
@@ -72,6 +74,7 @@ func pal(c *ui.Context) palette {
 		p.success = ui.Hex("#247647")
 	}
 	p.raised = p.hover
+	p.control = p.surface.Mix(p.bg, 0.4)
 	p.accentLine = p.accent
 	return p
 }
