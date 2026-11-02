@@ -4,16 +4,20 @@
 
 macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/egoist/mygo) 开发。
 
-[运行截图](docs/screenshots.md)
+![GoPaste 经典主题贴底长条](docs/screenshots/bar-en.png)
+
+[查看面板、透明主题与设置截图](docs/screenshots.md)
 
 ## 功能
 
 - 记录复制过的文本、图片、链接、颜色和文件，保留来源应用和复制时间
 - 搜索历史记录，用普通列表整理内容，或用智能列表按规则筛选
 - 预览、拖拽记录，粘贴时可保留原格式或转为纯文本
+- 按记录类型选择粘贴格式：文本大小写与命名转换、Markdown、文件名与路径，以及 HEX / RGB / HSL 颜色
+- 按条数、存储容量与保存时间限制历史记录，普通列表中的记录不受这些限制
 - 自选不记录的应用，也可排除空白内容、带机密标记的内容和过大的图片
 - 面板可贴在屏幕底部，或在鼠标旁弹出，大小可调
-- 经典和透明两种主题，可切换中英文
+- 经典和透明两种主题，均跟随系统深浅色，可切换中英文
 
 ## MyGo
 
@@ -24,7 +28,9 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 - 提供剪贴板、托盘、全局快捷键、拖拽和签名更新等桌面接口
 - 界面可直接测试和渲染为截图，无需打开窗口
 
-## 内存占用
+## 历史内存测量
+
+以下为历史开发构建的测量结果，未按当前版本重新测试。
 
 2026-10-23 使用本地开发构建（arm64）实测，环境为 macOS 27.0.1、Apple M1 Pro、32 GB 内存。
 
@@ -53,6 +59,10 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 默认按 `Command+Shift+V`（Windows 为 `Ctrl+Shift+V`）呼出或收起面板。面板形态、快捷键和排除规则可在设置中修改。
 
 macOS 自动粘贴需要在「系统设置 → 隐私与安全性 → 辅助功能」中授权 GoPaste。
+
+设置分为通用、快捷键、排除规则、高级和关于。历史限制与复制提示音位于通用，粘贴行为与数据管理位于高级，更新镜像与自动更新位于关于。
+
+选中记录后按 `Shift+Enter`，或在右键菜单中选择「粘贴为」，可按记录类型转换后粘贴。图片的 Markdown 格式引用本地文件。
 
 | 快捷键 | 操作 |
 | --- | --- |
@@ -101,4 +111,15 @@ go tool mygo build -platform windows/amd64 -o build
 
 各平台的程序、安装包和更新文件输出到对应的 `build/<平台>-<架构>/` 目录。
 
-发布前修改 `mygo.json` 的 `version`，重新打包。创建标签为 `v<版本号>` 的正式 Release，上传三个目录中的 `.tar.gz`、`update-*.json` 和 Windows Setup 安装包。
+本地 macOS 打包需要配置 `mygo.json` 中的 `macos.signingIdentity`；生成更新包还需要 `updates.privateKey` 或 `MYGO_UPDATER_PRIVATE_KEY`。
+
+正式发布使用 [Release 工作流](.github/workflows/release.yml)：修改 `mygo.json` 的 `version` 并提交，再推送对应标签。将下面的 `<版本号>` 替换为已提交的版本号：
+
+```bash
+git tag -a "v<版本号>" -m "GoPaste v<版本号>"
+git push origin main "v<版本号>"
+```
+
+工作流会测试并构建 macOS arm64、macOS amd64 和 Windows amd64，自动创建 GitHub Release，上传程序归档、Windows 安装包、自动更新清单与增量更新文件。
+
+仓库需要配置 `MACOS_CERTIFICATE_P12`、`MACOS_CERTIFICATE_PASSWORD` 和 `MYGO_UPDATER_PRIVATE_KEY` 三项 Actions secrets。macOS 发布包使用本地证书签名，未经过 Apple 公证。

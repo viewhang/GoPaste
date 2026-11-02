@@ -4,16 +4,20 @@ English | [简体中文](README.zh-CN.md)
 
 A clipboard manager for macOS and Windows, built with Go and [MyGo](https://github.com/egoist/mygo).
 
-[Screenshots](docs/screenshots.md)
+![GoPaste bottom bar in the Classic theme](docs/screenshots/bar-en.png)
+
+[See the panel, Transparent theme and settings](docs/screenshots.md)
 
 ## Features
 
 - Keep a history of copied text, images, links, colors and files, with the source app and copy time
 - Search your history, organize items in regular lists, or filter them with smart lists
 - Preview and drag items, and paste with formatting or as plain text
+- Choose formats for each record type: text case and naming conversions, Markdown, file names and paths, and HEX / RGB / HSL colors
+- Limit history by record count, storage size and retention time; records in regular lists are exempt from these limits
 - Choose which apps to exclude, and skip blank text, content marked confidential or images above a size limit
 - Use a resizable bottom bar or a panel that opens beside the cursor
-- Choose Classic or Transparent, in English or Simplified Chinese
+- Choose Classic or Transparent, both following the system's light or dark appearance, in English or Simplified Chinese
 
 ## MyGo
 
@@ -24,7 +28,9 @@ GoPaste uses [MyGo](https://github.com/egoist/mygo)'s native UI:
 - Desktop APIs for the clipboard, tray, global shortcuts, drag and drop, and signed updates
 - UI tests and screenshot rendering that run without opening a window
 
-## Memory usage
+## Historical memory measurements
+
+These measurements describe an earlier development build and have not been repeated for the current version.
 
 Measured on October 23, 2026 with a local arm64 development build on macOS 27.0.1, Apple M1 Pro and 32 GB RAM.
 
@@ -53,6 +59,10 @@ Download from [Releases](https://github.com/viewhang/go_paste/releases):
 Press `Command+Shift+V` on macOS or `Ctrl+Shift+V` on Windows to show or hide the panel. Panel layout, shortcuts and exclusion rules are configurable in Settings.
 
 On macOS, automatic paste requires permission in **System Settings → Privacy & Security → Accessibility**.
+
+Settings has five pages: General, Keyboard Shortcuts, Exclusion Rules, Advanced and About. General contains history limits and the copy sound; Advanced contains paste behavior and data management; About contains the update mirror and automatic updates.
+
+Select a record and press `Shift+Enter`, or choose **Paste As** from its context menu, to paste in a format supported by that record type. Markdown for images references local files.
 
 | Shortcut | Action |
 | --- | --- |
@@ -101,4 +111,15 @@ go tool mygo build -platform windows/amd64 -o build
 
 Binaries, installers and update files are written to `build/<platform>-<architecture>/`.
 
-Before releasing, update `version` in `mygo.json` and rebuild. Create a release tagged `v<version>`, then upload the `.tar.gz` archives, `update-*.json` manifests and Windows Setup installer from the three output directories.
+Local macOS builds require `macos.signingIdentity` in `mygo.json`. Update archives also require `updates.privateKey` or `MYGO_UPDATER_PRIVATE_KEY`.
+
+Official releases use the [Release workflow](.github/workflows/release.yml). Update `version` in `mygo.json`, commit it, then push the matching tag. Replace `<version>` below with the committed version:
+
+```bash
+git tag -a "v<version>" -m "GoPaste v<version>"
+git push origin main "v<version>"
+```
+
+The workflow tests and builds macOS arm64, macOS amd64 and Windows amd64, creates the GitHub Release, and uploads application archives, the Windows installer, update manifests and delta updates.
+
+The repository needs three Actions secrets: `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` and `MYGO_UPDATER_PRIVATE_KEY`. macOS packages use a local signing certificate and are not notarized by Apple.
