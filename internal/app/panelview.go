@@ -62,7 +62,7 @@ func (a *App) panelHeader(c *ui.Context, p palette) {
 	})
 }
 
-// headerRow 显示搜索框与统一设置菜单入口
+// headerRow 显示搜索框与设置菜单并让顶部留白支持保留键盘焦点的窗口拖动
 func (a *App) headerRow(c *ui.Context, p palette, compact bool) {
 	row := ui.Row(c).Padding(11, 12).Gap(7).AlignItems(ui.Center)
 	if a.settings.Theme == themeGlass {
@@ -72,6 +72,7 @@ func (a *App) headerRow(c *ui.Context, p palette, compact bool) {
 		}
 	}
 	row.Children(func() {
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Height(10).DragWindow().KeepFocus()
 		a.searchBox(c, p, compact)
 		a.settingsButton(c, p)
 	})
