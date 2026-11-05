@@ -54,7 +54,7 @@ func (a *App) clipboardData(rec *types.Record, plain bool) (transfer.Data, error
 				continue
 			}
 			if err != nil {
-				return transfer.Data{}, fmt.Errorf("%s: %w", locales.FileAccessFailed(), err)
+				return transfer.Data{}, fileReadError(err)
 			}
 			file.Close()
 			paths = append(paths, f.Path)

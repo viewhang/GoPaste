@@ -17,7 +17,7 @@ import (
 
 // keyboard 处理记录导航、列表切换、删除、快速粘贴与自定义操作快捷键
 func (a *App) keyboard(c *ui.Context) {
-	if a.recording != "" || a.prompt != nil {
+	if a.recording != "" || a.prompt != nil || a.hintOpen || a.choosingPasteFolder {
 		return
 	}
 	if !a.search.Focused(c) && a.shortcutPressed(c, "delete") && a.once() {
@@ -139,14 +139,15 @@ func (a *App) pasteSelected(plain bool) {
 	a.paste(rec, plain)
 }
 
-// paste 按纯文本偏好写入所选记录并执行粘贴、排序与搜索重置
+// paste 按纯文本偏好粘贴所选记录并在文件权限不足时提供授权重试
 func (a *App) paste(rec *types.Record, plain bool) {
 	if rec == nil {
 		return
 	}
-	data, err := a.clipboardData(rec, plain || a.settings.PastePlain)
+	plain = plain || a.settings.PastePlain
+	data, err := a.clipboardData(rec, plain)
 	if err != nil {
-		a.toast(err.Error())
+		a.pasteError(rec, err, func() { a.paste(rec, plain) })
 		return
 	}
 	a.pasteData(rec.ID, data)

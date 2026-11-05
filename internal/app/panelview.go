@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/plugins/glass"
@@ -316,10 +317,15 @@ func (a *App) statusRow(c *ui.Context, p palette) {
 	row := ui.Row(c).Height(statusHeight).Padding(0, 12).Gap(10).AlignItems(ui.Center)
 	row.BorderWidth(1, 0, 0, 0).BorderColor(p.hair)
 	row.Children(func() {
-		ui.Text(c, locales.RecordsCount(len(a.vis))).FontSize(10.5).TextColor(p.faint)
+		ui.Text(c, locales.RecordsCount(len(a.vis))).FontSize(10.5).TextColor(p.faint).SingleLine().Shrink(0)
 		if a.hintFlash != "" {
 			ui.Text(c, "·").FontSize(10.5).TextColor(p.faint)
-			ui.Text(c, a.hintFlash).FontSize(10.5).TextColor(p.muted).SingleLine()
+			summary, _, _ := strings.Cut(a.hintFlash, "\n")
+			hint := ui.Text(c, summary).FontSize(10.5).TextColor(p.muted).SingleLine().Shrink(1).
+				Focusable().KeepFocus().Cursor(ui.CursorPointer).Tooltip(locales.ViewDetails())
+			if hint.Clicked() {
+				a.hintOpen = true
+			}
 		}
 		ui.Spacer(c)
 		if a.settings.Paused {

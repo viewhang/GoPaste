@@ -167,11 +167,11 @@ func markdownImageRecord(rec *types.Record) bool {
 		strings.HasPrefix(mime.TypeByExtension(filepath.Ext(rec.Files[0].Path)), "image/")
 }
 
-// pasteAs 按指定格式生成剪贴板内容并复用正常粘贴流程
+// pasteAs 按指定格式粘贴并在文件权限不足时提供保留格式的授权重试
 func (a *App) pasteAs(rec *types.Record, format pasteFormat) {
 	data, err := a.pasteAsData(rec, format)
 	if err != nil {
-		a.toast(err.Error())
+		a.pasteError(rec, err, func() { a.pasteAs(rec, format) })
 		return
 	}
 	a.pasteData(rec.ID, data)
@@ -200,7 +200,10 @@ func (a *App) pasteAsData(rec *types.Record, format pasteFormat) (transfer.Data,
 				label = filepath.Base(path)
 			}
 			if _, err := os.Stat(path); err != nil {
-				return transfer.Data{}, errors.New(locales.ImageFileMissing())
+				if errors.Is(err, fs.ErrNotExist) {
+					return transfer.Data{}, errors.New(locales.ImageFileMissing())
+				}
+				return transfer.Data{}, fileReadError(err)
 			}
 			files, err := transfer.FileData(path)
 			if err != nil {

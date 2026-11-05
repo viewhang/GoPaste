@@ -1109,12 +1109,68 @@ func (msgs Messages) OriginalFileMissing() string {
 	return Catalog.Format(msgs.locale, "originalFileMissing", nil)
 }
 
-// FileAccessFailed 返回应用当前语言的文件读取权限提示
+// FileAccessFailed 返回应用当前语言的文件读取失败提示
 func FileAccessFailed() string { return In(i18n.Locale()).FileAccessFailed() }
 
-// FileAccessFailed 返回指定语言的文件读取权限提示
+// FileAccessFailed 返回指定语言的文件读取失败提示
 func (msgs Messages) FileAccessFailed() string {
 	return Catalog.Format(msgs.locale, "fileAccessFailed", nil)
+}
+
+// FileReadPermissionDenied 返回应用当前语言的文件读取权限提示
+func FileReadPermissionDenied() string { return In(i18n.Locale()).FileReadPermissionDenied() }
+
+// FileReadPermissionDenied 返回指定语言的文件读取权限提示
+func (msgs Messages) FileReadPermissionDenied() string {
+	return Catalog.Format(msgs.locale, "fileReadPermissionDenied", nil)
+}
+
+// AuthorizeFolder 返回应用当前语言的文件夹授权入口名称
+func AuthorizeFolder() string { return In(i18n.Locale()).AuthorizeFolder() }
+
+// AuthorizeFolder 返回指定语言的文件夹授权入口名称
+func (msgs Messages) AuthorizeFolder() string {
+	return Catalog.Format(msgs.locale, "authorizeFolder", nil)
+}
+
+// AuthorizeFolderHint 返回应用当前语言的文件夹选择说明
+func AuthorizeFolderHint() string { return In(i18n.Locale()).AuthorizeFolderHint() }
+
+// AuthorizeFolderHint 返回指定语言的文件夹选择说明
+func (msgs Messages) AuthorizeFolderHint() string {
+	return Catalog.Format(msgs.locale, "authorizeFolderHint", nil)
+}
+
+// AuthorizeAndPaste 返回应用当前语言的授权并粘贴按钮名称
+func AuthorizeAndPaste() string { return In(i18n.Locale()).AuthorizeAndPaste() }
+
+// AuthorizeAndPaste 返回指定语言的授权并粘贴按钮名称
+func (msgs Messages) AuthorizeAndPaste() string {
+	return Catalog.Format(msgs.locale, "authorizeAndPaste", nil)
+}
+
+// SelectContainingFolder 返回应用当前语言的文件夹范围校验提示
+func SelectContainingFolder() string { return In(i18n.Locale()).SelectContainingFolder() }
+
+// SelectContainingFolder 返回指定语言的文件夹范围校验提示
+func (msgs Messages) SelectContainingFolder() string {
+	return Catalog.Format(msgs.locale, "selectContainingFolder", nil)
+}
+
+// ViewDetails 返回应用当前语言的完整信息查看提示
+func ViewDetails() string { return In(i18n.Locale()).ViewDetails() }
+
+// ViewDetails 返回指定语言的完整信息查看提示
+func (msgs Messages) ViewDetails() string {
+	return Catalog.Format(msgs.locale, "viewDetails", nil)
+}
+
+// OperationDetails 返回应用当前语言的操作详情标题
+func OperationDetails() string { return In(i18n.Locale()).OperationDetails() }
+
+// OperationDetails 返回指定语言的操作详情标题
+func (msgs Messages) OperationDetails() string {
+	return Catalog.Format(msgs.locale, "operationDetails", nil)
 }
 
 // NoPasteContent says "这条记录没有可粘贴的内容"

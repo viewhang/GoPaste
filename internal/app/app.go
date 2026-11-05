@@ -131,7 +131,13 @@ type App struct {
 	choosingExcludedApps bool
 	hintFlash            string
 	hintUntil            time.Time
-	lastReload           time.Time
+	// hintOpen 标记完整操作反馈是否正在显示
+	hintOpen bool
+	// fileAuthorization 保存待授权文件夹与原粘贴操作
+	fileAuthorization *fileAuthorization
+	// choosingPasteFolder 标记授权选择器正在打开以保持面板
+	choosingPasteFolder bool
+	lastReload          time.Time
 }
 
 // NewApp 创建应用状态并限制链接预览的并发任务数
@@ -518,8 +524,12 @@ func (a *App) showOnScreenHint() {
 	}
 }
 
-// hide 隐藏剪贴板面板并释放应用持有的图片缓存
+// hide 在未选择授权文件夹时隐藏剪贴板面板并释放图片缓存
 func (a *App) hide() {
+	if a.choosingPasteFolder {
+		return
+	}
+	a.hintOpen = false
 	a.preview = false
 	a.detail = nil
 	a.releaseImages()
@@ -647,6 +657,8 @@ func (a *App) storageError(err error) {
 func (a *App) toast(msg string) {
 	a.hintFlash = msg
 	a.hintUntil = time.Time{}
+	a.hintOpen = false
+	a.fileAuthorization = nil
 	if a.win != nil {
 		a.win.Invalidate()
 	}

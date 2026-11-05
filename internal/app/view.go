@@ -37,5 +37,6 @@ func (a *App) view(c *ui.Context) {
 		a.panelView(c, p)
 	}
 	a.promptOverlay(c, p)
+	a.hintDetails(c, p)
 	a.runPending()
 }
