@@ -6,7 +6,7 @@
   "icon": "internal/assets/icon.png",
   "out": "build",
   "updates": {
-    "github": "viewhang/go_paste",
+    "github": "viewhang/GoPaste",
     "publicKey": "GD6zROKRwaGD7TJw456tE1tVb8GL/A7CGb+PEm5Wuxc=",
     "privateKey": "~/Library/Application Support/GoPaste/update-keys/mygo-update.key"
   },

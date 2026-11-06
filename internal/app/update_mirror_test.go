@@ -53,14 +53,14 @@ func TestUpdateMirrorRequests(t *testing.T) {
 			t.Error("镜像请求丢失了更新请求头")
 		}
 		switch strings.TrimPrefix(req.URL.Path, "/proxy") {
-		case "/https://github.com/viewhang/go_paste/releases/latest/download/update-darwin-arm64.json":
+		case "/https://github.com/viewhang/GoPaste/releases/latest/download/update-darwin-arm64.json":
 			w.Header().Set("Location", "/manifest.json")
 			w.WriteHeader(http.StatusFound)
 		case "/manifest.json":
 			io.WriteString(w, `{"version":"0.1.4"}`)
-		case "/https://github.com/viewhang/go_paste/releases/download/v0.1.4/gopaste.tar.gz":
+		case "/https://github.com/viewhang/GoPaste/releases/download/v0.1.4/gopaste.tar.gz":
 			io.WriteString(w, "archive")
-		case "/https://github.com/viewhang/go_paste/releases/download/v0.1.4/gopaste.delta":
+		case "/https://github.com/viewhang/GoPaste/releases/download/v0.1.4/gopaste.delta":
 			io.WriteString(w, "delta")
 		default:
 			http.NotFound(w, req)
@@ -77,7 +77,7 @@ func TestUpdateMirrorRequests(t *testing.T) {
 	} {
 		prefix := server.URL + tc.prefix
 		transport.prefix.Store(&prefix)
-		original := "https://github.com/viewhang/go_paste/releases/" + tc.path
+		original := "https://github.com/viewhang/GoPaste/releases/" + tc.path
 		req, err := http.NewRequest(http.MethodGet, original, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -119,9 +119,9 @@ func TestUpdateMirrorSource(t *testing.T) {
 	transport.prefix.Store(&prefix)
 	var source mygo.UpdateSource = transport
 	for i, address := range []string{
-		"https://github.com/viewhang/go_paste/releases/latest/download/update-" + runtime.GOOS + "-" + runtime.GOARCH + ".json",
-		"https://github.com/viewhang/go_paste/releases/download/v0.1.4/gopaste.tar.gz",
-		"https://github.com/viewhang/go_paste/releases/download/v0.1.4/gopaste.delta",
+		"https://github.com/viewhang/GoPaste/releases/latest/download/update-" + runtime.GOOS + "-" + runtime.GOARCH + ".json",
+		"https://github.com/viewhang/GoPaste/releases/download/v0.1.4/gopaste.tar.gz",
+		"https://github.com/viewhang/GoPaste/releases/download/v0.1.4/gopaste.delta",
 	} {
 		want = address
 		var body io.ReadCloser
@@ -154,10 +154,10 @@ func TestUpdateMirrorSource(t *testing.T) {
 // TestUpdateMirrorScope 验证链接预览和其他仓库保持直连且镜像失败时不改走原站
 func TestUpdateMirrorScope(t *testing.T) {
 	for _, tc := range []struct{ address, agent, prefix string }{
-		{"https://github.com/viewhang/go_paste/releases/latest/download/update.json", "GoPaste/0.1", "https://mirror.example"},
+		{"https://github.com/viewhang/GoPaste/releases/latest/download/update.json", "GoPaste/0.1", "https://mirror.example"},
 		{"https://github.com/other/repo/releases/latest/download/update.json", "mygo-updater", "https://mirror.example"},
 		{"https://example.com/file", "mygo-updater", "https://mirror.example"},
-		{"https://github.com/viewhang/go_paste/releases/latest/download/update.json", "mygo-updater", ""},
+		{"https://github.com/viewhang/GoPaste/releases/latest/download/update.json", "mygo-updater", ""},
 	} {
 		transport := &updateMirrorTransport{base: mirrorRoundTripper(func(req *http.Request) (*http.Response, error) {
 			if req.URL.String() != tc.address {
@@ -183,7 +183,7 @@ func TestUpdateMirrorScope(t *testing.T) {
 	})}
 	prefix := "https://mirror.example"
 	transport.prefix.Store(&prefix)
-	req, _ := http.NewRequest(http.MethodGet, "https://github.com/viewhang/go_paste/releases/latest/download/update.json", nil)
+	req, _ := http.NewRequest(http.MethodGet, "https://github.com/viewhang/GoPaste/releases/latest/download/update.json", nil)
 	req.Header.Set("User-Agent", "mygo-updater")
 	if _, err := transport.RoundTrip(req); err != want || calls != 1 {
 		t.Fatalf("镜像错误未直接返回：请求 %d 次，错误 %v", calls, err)

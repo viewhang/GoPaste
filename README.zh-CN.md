@@ -4,9 +4,23 @@
 
 macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/egoist/mygo) 开发。
 
+**贴底长条 · 经典主题**
+
 ![GoPaste 经典主题贴底长条](docs/screenshots/bar-en.png)
 
-[查看面板、透明主题与设置截图](docs/screenshots.md)
+**跟随鼠标面板 · 透明主题**
+
+<img src="docs/screenshots/panel-en.png" alt="GoPaste 透明主题跟随鼠标面板" width="432">
+
+**粘贴为 · 文本转换**
+
+<img src="docs/screenshots/paste-as-en.png" alt="GoPaste 粘贴为菜单，支持纯文本、大写、小写、大驼峰、小驼峰、下划线和短横线命名" width="580">
+
+**粘贴为 · 文件信息**
+
+<img src="docs/screenshots/paste-as-files-en.png" alt="GoPaste 文件类型粘贴为菜单，支持文件名（含后缀）、文件名（不含后缀）和文件路径" width="720">
+
+[查看更多主题与设置截图](docs/screenshots.md)
 
 ## 功能
 
@@ -18,6 +32,12 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 - 自选不记录的应用，也可排除空白内容、带机密标记的内容和过大的图片
 - 面板可贴在屏幕底部，或在鼠标旁弹出，大小可调
 - 经典和透明两种主题，均跟随系统深浅色，可切换中英文
+
+## 隐私
+
+- **无遥测**：不采集使用统计或行为数据，不做埋点追踪
+- **本地存储**：剪贴板历史和图片仅保存在本机，不向开发者上传剪贴板内容
+- **联网行为透明**：启用链接预览时会访问对应网站及预览图片地址；检查和下载更新时会连接 GitHub 或你配置的镜像
 
 ## MyGo
 
@@ -51,7 +71,7 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 
 ## 安装与使用
 
-在 [Releases](https://github.com/viewhang/go_paste/releases) 下载：
+在 [Releases](https://github.com/viewhang/GoPaste/releases) 下载：
 
 - macOS：选择 Apple Silicon（arm64）或 Intel（x64）版本，解压后将 `GoPaste.app` 放入应用程序目录
 - Windows：运行 x64 Setup 安装包

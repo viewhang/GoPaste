@@ -4,9 +4,23 @@ English | [简体中文](README.zh-CN.md)
 
 A clipboard manager for macOS and Windows, built with Go and [MyGo](https://github.com/egoist/mygo).
 
+**Bottom bar · Classic theme**
+
 ![GoPaste bottom bar in the Classic theme](docs/screenshots/bar-en.png)
 
-[See the panel, Transparent theme and settings](docs/screenshots.md)
+**Pointer panel · Transparent theme**
+
+<img src="docs/screenshots/panel-en.png" alt="GoPaste pointer panel in the Transparent theme" width="432">
+
+**Paste As · Text conversions**
+
+<img src="docs/screenshots/paste-as-en.png" alt="GoPaste Paste As menu with plain text, uppercase, lowercase, PascalCase, camelCase, snake_case and kebab-case options" width="580">
+
+**Paste As · File information**
+
+<img src="docs/screenshots/paste-as-files-en.png" alt="GoPaste file Paste As menu with file name including the extension, file name without the extension and file path options" width="720">
+
+[See more theme and settings screenshots](docs/screenshots.md)
 
 ## Features
 
@@ -18,6 +32,12 @@ A clipboard manager for macOS and Windows, built with Go and [MyGo](https://gith
 - Choose which apps to exclude, and skip blank text, content marked confidential or images above a size limit
 - Use a resizable bottom bar or a panel that opens beside the cursor
 - Choose Classic or Transparent, both following the system's light or dark appearance, in English or Simplified Chinese
+
+## Privacy
+
+- **No telemetry**: no usage analytics, behavioral data collection or tracking
+- **Local storage**: clipboard history and images stay on your device; clipboard content is not uploaded to the developer
+- **Transparent network access**: enabling link previews contacts the linked website and preview image hosts; update checks and downloads connect to GitHub or your configured mirror
 
 ## MyGo
 
@@ -51,7 +71,7 @@ The test covered storage and UI in a native window, without clipboard monitoring
 
 ## Install and use
 
-Download from [Releases](https://github.com/viewhang/go_paste/releases):
+Download from [Releases](https://github.com/viewhang/GoPaste/releases):
 
 - macOS: choose Apple Silicon (arm64) or Intel (x64), extract the archive and move `GoPaste.app` to Applications
 - Windows: run the x64 Setup installer

@@ -25,7 +25,7 @@ type updateMirrorTransport struct {
 
 // Manifest 读取当前平台的稳定版更新清单
 func (t *updateMirrorTransport) Manifest(ctx context.Context, _ bool) (io.ReadCloser, error) {
-	return t.Open(ctx, "https://github.com/viewhang/go_paste/releases/latest/download/update-"+runtime.GOOS+"-"+runtime.GOARCH+".json")
+	return t.Open(ctx, "https://github.com/viewhang/GoPaste/releases/latest/download/update-"+runtime.GOOS+"-"+runtime.GOARCH+".json")
 }
 
 // Open 下载更新文件并保留请求取消、镜像重定向与 HTTP 错误
@@ -58,7 +58,7 @@ func (t *updateMirrorTransport) RoundTrip(req *http.Request) (*http.Response, er
 	prefix := t.prefix.Load()
 	if prefix == nil || *prefix == "" || req.Method != http.MethodGet ||
 		req.URL.Scheme != "https" || req.URL.Host != "github.com" ||
-		!strings.HasPrefix(req.URL.Path, "/viewhang/go_paste/releases/") ||
+		!strings.HasPrefix(req.URL.Path, "/viewhang/GoPaste/releases/") ||
 		req.Header.Get("User-Agent") != "mygo-updater" {
 		return t.base.RoundTrip(req)
 	}
