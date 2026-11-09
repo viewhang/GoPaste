@@ -9,7 +9,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/native"
 	"gopaste/internal/types"
 )
 
@@ -301,7 +300,7 @@ func (a *App) settingsData(c *ui.Context, p palette) {
 			})
 			if isDarwin {
 				ui.Divider(c)
-				trusted := native.AccessibilityTrusted()
+				trusted := accessTrusted()
 				desc := locales.AccessNeeded()
 				if trusted {
 					desc = ""
@@ -309,8 +308,8 @@ func (a *App) settingsData(c *ui.Context, p palette) {
 				settingRow(c, p, locales.AccessPermission(), desc, func() {
 					if trusted {
 						ui.Text(c, locales.Enabled()).FontSize(11.5).TextColor(p.muted)
-					} else if a.themePrimaryButton(c, locales.EnableAccess()).Clicked() {
-						native.PromptAccessibility()
+					} else {
+						a.themePrimaryButton(c, locales.EnableAccess()).OnClick(a.requestAccess)
 					}
 				})
 			}

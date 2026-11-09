@@ -1,11 +1,13 @@
 package app
 
 import (
+	"context"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/permissionflow"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 
@@ -245,6 +247,30 @@ func (a *App) closePreview() {
 	}
 }
 
+// requestAccess 打开辅助功能授权引导并在授权后刷新面板和设置
 func (a *App) requestAccess() {
-	native.PromptAccessibility()
+	if !a.needsAccess() {
+		return
+	}
+	go func() {
+		status, err := permissionflow.Guide(context.Background(), permissionflow.Accessibility, permissionflow.GuideOptions{})
+		if err != nil {
+			mygo.Dialog.Error(locales.AccessPermission(), err.Error())
+			return
+		}
+		if status != permissionflow.Granted {
+			return
+		}
+		mygo.RunOnMain(func() {
+			if a.hintFlash == locales.CopiedNeedAccess() {
+				a.toast("")
+			}
+			if a.win != nil {
+				a.win.Invalidate()
+			}
+			if a.setWin != nil {
+				a.setWin.Invalidate()
+			}
+		})
+	}()
 }
