@@ -159,16 +159,16 @@ func TestGlassSegmentedAnimation(t *testing.T) {
 	}
 }
 
-// TestThemeSwitchInteraction 验证两种主题的开关均支持点击聚焦与空格切换
+// TestThemeSwitchInteraction 验证两种主题开关的点击、聚焦、键盘切换与禁用行为
 func TestThemeSwitchInteraction(t *testing.T) {
 	for _, theme := range []int{themeClassic, themeGlass} {
 		t.Run(fmt.Sprintf("theme-%d", theme), func(t *testing.T) {
 			a := NewApp()
 			a.settings.Theme = theme
-			on := false
+			on, disabled := false, false
 			tt := ui.NewTester(func(c *ui.Context) {
 				a.applyTheme(c)
-				a.themeSwitch(c, &on).Label("测试开关")
+				a.themeSwitch(c, &on).Label("测试开关").Disabled(disabled)
 			}, 80, 40)
 			if err := tt.Click("测试开关"); err != nil || !on || !tt.Focused("测试开关") {
 				t.Fatalf("点击开关未启用或未聚焦：%v", err)
@@ -177,6 +177,64 @@ func TestThemeSwitchInteraction(t *testing.T) {
 			if on {
 				t.Fatal("空格未关闭开关")
 			}
+			disabled = true
+			tt.Frame()
+			tt.ClickAt(18, 10)
+			tt.Key(0, ui.KeySpace)
+			if on {
+				t.Fatal("禁用开关仍响应点击或空格")
+			}
+		})
+	}
+}
+
+// TestGlassSwitchFeedback 验证明暗外观中的悬停、按压变形与减少动态效果设置
+func TestGlassSwitchFeedback(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dark-%v", dark), func(t *testing.T) {
+			a := NewApp()
+			a.settings.Theme = themeGlass
+			on := false
+			tt := ui.NewTester(func(c *ui.Context) {
+				a.applyTheme(c)
+				c.Root().Background(c.Theme().Surface)
+				ui.Box(c).Padding(16).Children(func() {
+					a.themeSwitch(c, &on).Label("玻璃开关")
+				})
+			}, 100, 60)
+			tt.SetScale(2)
+			tt.SetDark(dark)
+			r, ok := tt.Find("玻璃开关")
+			if !ok {
+				t.Fatal("未显示玻璃开关")
+			}
+			x, y := r.X+r.W/2, r.Y+r.H/2
+			idle := bytes.Clone(tt.Image().Pix)
+			tt.Move(x, y)
+			if bytes.Equal(idle, tt.Image().Pix) {
+				t.Fatal("悬停未改变玻璃滑块染色")
+			}
+			tt.Press(x, y)
+			start := bytes.Clone(tt.Image().Pix)
+			tt.Advance(75 * time.Millisecond)
+			middle := bytes.Clone(tt.Image().Pix)
+			tt.Advance(150 * time.Millisecond)
+			if bytes.Equal(start, middle) || bytes.Equal(middle, tt.Image().Pix) {
+				t.Fatal("按压未经过中间形态完成玻璃变形")
+			}
+			tt.Release(x, y)
+			if !on {
+				t.Fatal("释放玻璃开关后未启用")
+			}
+			tt.Advance(200 * time.Millisecond)
+			tt.SetPreferences(ui.Preferences{ReduceMotion: true})
+			tt.Press(x, y)
+			instant := bytes.Clone(tt.Image().Pix)
+			tt.Advance(200 * time.Millisecond)
+			if !bytes.Equal(instant, tt.Image().Pix) {
+				t.Fatal("减少动态效果时按压变形未立即完成")
+			}
+			tt.Release(x, y)
 		})
 	}
 }

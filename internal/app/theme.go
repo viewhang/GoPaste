@@ -68,7 +68,7 @@ func (a *App) themeControl(c *ui.Context, e ui.Element) ui.Element {
 	return e
 }
 
-// themeSwitch 使用统一中性底色与启用色绘制轨道并保留中性玻璃滑块
+// themeSwitch 为透明主题绘制半透明折射滑块、悬停染色与按压变形反馈
 func (a *App) themeSwitch(c *ui.Context, on *bool) ui.Element {
 	if a.settings.Theme != themeGlass {
 		return ui.Switch(c, on)
@@ -87,12 +87,17 @@ func (a *App) themeSwitch(c *ui.Context, on *bool) ui.Element {
 	if c.Direction() == ui.RightToLeft {
 		pos = 1 - pos
 	}
+	tint := t.Surface.Alpha(0.65)
+	if sw.Hovered() {
+		tint = t.Surface.Alpha(0.5)
+	}
+	material := (glass.Glass{Tint: tint, Interactive: true}).BuildMaterial(sw)
 	sw.Draw(func(p *ui.Painter, r ui.Rect) {
 		width, height := r.H+6, r.H+2
 		knob := ui.Rect{X: r.X - 1 + pos*(r.W-width+2), Y: r.Y - 1, W: width, H: height}
 		p.Shadow(knob, height/2, 0, 1, 3, 0, ui.RGBA(0, 0, 0, 0.25))
-		p.Fill(knob, t.Surface, height/2)
-		glass.Paint(p, knob, height/2, glass.Glass{Tint: t.Surface})
+		radius := height / 2
+		material.PaintMaterial(p, knob, [4]float32{radius, radius, radius, radius})
 	})
 	return sw
 }
