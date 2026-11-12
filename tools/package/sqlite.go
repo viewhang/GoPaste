@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// sqliteLibrary 描述插件清单中指定架构的原生库
+// sqliteLibrary 描述 SQLite 原生模块清单中指定架构的库
 type sqliteLibrary struct {
 	Name   string `json:"name"`
 	URL    string `json:"url"`
@@ -23,7 +23,7 @@ type sqliteLibrary struct {
 
 // bundleSQLite 将当前 MyGo 版本声明的目标架构库校验后放入应用资源目录
 func bundleSQLite(root, resources, arch, identity string) error {
-	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "github.com/egoist/mygo/plugins/sqlite")
+	cmd := exec.Command("go", "list", "-f", "{{.Dir}}", "github.com/egoist/mygo/plugins/sqlite/internal/sqlitecore")
 	cmd.Dir = root
 	dir, err := cmd.Output()
 	if err != nil {
