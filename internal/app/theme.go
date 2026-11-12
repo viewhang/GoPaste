@@ -68,36 +68,90 @@ func (a *App) themeControl(c *ui.Context, e ui.Element) ui.Element {
 	return e
 }
 
-// themeSwitch 为透明主题绘制半透明折射滑块、悬停染色与按压变形反馈
+// glassSwitchState 保存开关按压起点、拖动位移与滑块位置
+type glassSwitchState struct {
+	held, dragging    bool
+	start, delta, pos float32
+}
+
+// themeSwitch 为透明主题绘制静止白色滑块并支持拖动时的玻璃放大与松手吸附
 func (a *App) themeSwitch(c *ui.Context, on *bool) ui.Element {
 	if a.settings.Theme != themeGlass {
 		return ui.Switch(c, on)
 	}
 	t, p := c.Theme(), pal(c)
 	sw := ui.SwitchBase(c, on).Size(t.Space(9), t.Space(5)).Radius(t.Space(2.5))
+	knobWidth, inset := t.Space(5), t.Space(0.375)
+	state := ui.Local(sw, "switch-drag", func() glassSwitchState { return glassSwitchState{} })
+	dx, _, _ := sw.Dragged()
+	button, held := sw.PressedButton()
+	held = held && button == 0
+	if state.held && !held {
+		if state.dragging && !sw.PressCanceled() && !sw.IsDisabled() {
+			*on = state.pos >= 0.5
+		}
+		state.held, state.dragging = false, false
+	}
 	target := float32(0)
 	if *on {
 		target = 1
 	}
 	pos := sw.Animate("knob", target, 140*time.Millisecond)
-	sw.Background(p.control.Mix(t.Accent, pos)).Border(1, p.hair.Mix(t.Accent, pos))
-	if sw.Focused() {
-		sw.BorderColor(t.Focus)
-	}
+	direction := float32(1)
 	if c.Direction() == ui.RightToLeft {
-		pos = 1 - pos
+		direction = -1
 	}
-	tint := t.Surface.Alpha(0.65)
-	if sw.Hovered() {
-		tint = t.Surface.Alpha(0.5)
+	if held {
+		if !state.held {
+			state.start, state.delta = pos, 0
+		}
+		state.held = true
+		state.delta += dx * direction
+		if math.Abs(float64(state.delta)) >= 2 {
+			state.dragging = true
+		}
+		pos = state.start
+		if state.dragging {
+			pos = max(0, min(1, pos+state.delta/(sw.Bounds().W-knobWidth-2*inset)))
+		}
+		state.pos = sw.Jump("knob", pos)
 	}
-	material := (glass.Glass{Tint: tint, Interactive: true}).BuildMaterial(sw)
-	sw.Draw(func(p *ui.Painter, r ui.Rect) {
-		width, height := r.H+6, r.H+2
-		knob := ui.Rect{X: r.X - 1 + pos*(r.W-width+2), Y: r.Y - 1, W: width, H: height}
-		p.Shadow(knob, height/2, 0, 1, 3, 0, ui.RGBA(0, 0, 0, 0.25))
-		radius := height / 2
-		material.PaintMaterial(p, knob, [4]float32{radius, radius, radius, radius})
+	liftTarget := float32(0)
+	if held {
+		liftTarget = 1
+	}
+	lift := sw.Animate("lift", liftTarget, 140*time.Millisecond)
+	trackTarget := target
+	if held {
+		trackTarget = float32(math.Round(float64(pos)))
+	}
+	trackPos := sw.Animate("track", trackTarget, 140*time.Millisecond)
+	sw.Checked(*on).Draw(func(painter *ui.Painter, r ui.Rect) {
+		track := ui.Rect{X: r.X, Y: r.Y + t.Space(0.5), W: r.W, H: r.H - t.Space(1)}
+		painter.Fill(track, p.border.Mix(t.Accent, trackPos), track.H/2)
+		if sw.FocusVisible() {
+			painter.Stroke(track, t.Focus, track.H/2, 1)
+		}
+		at := pos
+		if direction < 0 {
+			at = 1 - at
+		}
+		width, height := knobWidth+lift*t.Space(3.5), track.H-2*inset+lift*t.Space(2.25)
+		center := r.X + inset + knobWidth/2 + at*(r.W-knobWidth-2*inset)
+		knob := ui.Rect{X: center - width/2, Y: r.Y + (r.H-height)/2, W: width, H: height}
+		painter.Shadow(knob, height/2, 0, 1, 3, 0, ui.RGBA(0, 0, 0, 0.25))
+		opacity := float32(1)
+		if lift > 0 && !painter.Preferences().ReduceTransparency {
+			scale, radius := painter.Scale(), height/2
+			painter.Effect(glass.Effect, knob, [4]float32{radius, radius, radius, radius}, 0.5*scale, [5][4]float32{
+				{3 * scale, 1.5 * scale, 0.35, 1},
+				{},
+				{0, 1, 1, 1},
+				{0, 1},
+			})
+			opacity = 1 - lift
+		}
+		painter.Fill(knob, ui.RGB(255, 255, 255).Alpha(opacity), height/2)
 	})
 	return sw
 }

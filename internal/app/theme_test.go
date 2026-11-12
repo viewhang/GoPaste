@@ -188,7 +188,7 @@ func TestThemeSwitchInteraction(t *testing.T) {
 	}
 }
 
-// TestGlassSwitchFeedback 验证明暗外观中的悬停、按压变形与减少动态效果设置
+// TestGlassSwitchFeedback 验证明暗外观中的静止白色滑块、交互玻璃与减少动态效果及透明度设置
 func TestGlassSwitchFeedback(t *testing.T) {
 	for _, dark := range []bool{false, true} {
 		t.Run(fmt.Sprintf("dark-%v", dark), func(t *testing.T) {
@@ -209,11 +209,29 @@ func TestGlassSwitchFeedback(t *testing.T) {
 				t.Fatal("未显示玻璃开关")
 			}
 			x, y := r.X+r.W/2, r.Y+r.H/2
-			idle := bytes.Clone(tt.Image().Pix)
-			tt.Move(x, y)
-			if bytes.Equal(idle, tt.Image().Pix) {
-				t.Fatal("悬停未改变玻璃滑块染色")
+			out := ""
+			if os.Getenv("SHOTS") != "" {
+				out = filepath.Join("..", "..", ".mygo", "shots")
+				if err := os.MkdirAll(out, 0o755); err != nil {
+					t.Fatal(err)
+				}
 			}
+			// capture 保存开关状态供外观比对
+			capture := func(state string) {
+				if out != "" {
+					writePNG(t, filepath.Join(out, fmt.Sprintf("glass-switch-%s-dark-%v.png", state, dark)), tt.Image())
+				}
+			}
+			// whiteKnob 验证静止滑块中心保持白色
+			whiteKnob := func(at float32) {
+				t.Helper()
+				pixel := tt.Image().RGBAAt(int((r.X+r.W*at)*2), int(y*2))
+				if pixel.R < 245 || pixel.G < 245 || pixel.B < 245 {
+					t.Fatalf("静止滑块不是白色：%v", pixel)
+				}
+			}
+			whiteKnob(1.0 / 3)
+			capture("off")
 			tt.Press(x, y)
 			start := bytes.Clone(tt.Image().Pix)
 			tt.Advance(75 * time.Millisecond)
@@ -227,15 +245,90 @@ func TestGlassSwitchFeedback(t *testing.T) {
 				t.Fatal("释放玻璃开关后未启用")
 			}
 			tt.Advance(200 * time.Millisecond)
+			whiteKnob(2.0 / 3)
+			capture("on")
 			tt.SetPreferences(ui.Preferences{ReduceMotion: true})
 			tt.Press(x, y)
+			tt.Move(x+4, y)
+			capture("drag")
 			instant := bytes.Clone(tt.Image().Pix)
 			tt.Advance(200 * time.Millisecond)
 			if !bytes.Equal(instant, tt.Image().Pix) {
 				t.Fatal("减少动态效果时按压变形未立即完成")
 			}
 			tt.Release(x, y)
+			tt.SetPreferences(ui.Preferences{ReduceMotion: true, ReduceTransparency: true})
+			tt.Press(x, y)
+			whiteKnob(0.5)
+			tt.CancelPress()
 		})
+	}
+}
+
+// TestGlassSwitchDrag 验证拖动跟手、松手取值、取消、禁用与从右到左的开关交互
+func TestGlassSwitchDrag(t *testing.T) {
+	for _, dark := range []bool{false, true} {
+		for _, direction := range []ui.Direction{ui.LeftToRight, ui.RightToLeft} {
+			for _, test := range []struct {
+				name                       string
+				on, want, cancel, disabled bool
+				dx                         float32
+			}{
+				{name: "开启", dx: 10, want: true},
+				{name: "关闭", on: true, dx: -10},
+				{name: "保留关闭", dx: 3},
+				{name: "保留开启", on: true, dx: -3, want: true},
+				{name: "越界松手", dx: 40, want: true},
+				{name: "取消拖动", dx: 10, cancel: true},
+				{name: "禁用拖动", dx: 10, disabled: true},
+			} {
+				t.Run(fmt.Sprintf("%s-dark-%v-direction-%v", test.name, dark, direction), func(t *testing.T) {
+					a := NewApp()
+					a.settings.Theme = themeGlass
+					saved := test.on
+					tt := ui.NewTester(func(c *ui.Context) {
+						a.applyTheme(c)
+						c.Root().Background(c.Theme().Surface)
+						ui.Box(c).Padding(16).Children(func() {
+							on := saved
+							a.themeSwitch(c, &on).Label("拖动开关").Disabled(test.disabled)
+							saved = on
+						})
+					}, 100, 60)
+					tt.SetDark(dark)
+					tt.SetDirection(direction)
+					tt.SetPreferences(ui.Preferences{ReduceMotion: true})
+					r, ok := tt.Find("拖动开关")
+					if !ok {
+						t.Fatal("未显示拖动开关")
+					}
+					x, y, dx := r.X+r.W/3, r.Y+r.H/2, test.dx
+					if test.on {
+						x = r.X + r.W*2/3
+					}
+					if direction == ui.RightToLeft {
+						x, dx = r.X+r.W-(x-r.X), -dx
+					}
+					tt.Press(x, y)
+					pressed := bytes.Clone(tt.Image().Pix)
+					tt.Move(x+dx, y)
+					if !test.disabled && bytes.Equal(pressed, tt.Image().Pix) {
+						t.Fatal("拖动时滑块未跟随指针移动")
+					}
+					if saved != test.on {
+						t.Fatal("松手前提交了开关状态")
+					}
+					if test.cancel {
+						tt.CancelPress()
+					} else {
+						tt.Release(x+dx, y)
+					}
+					if saved != test.want {
+						t.Fatalf("松手后的开关状态为 %v，期望 %v", saved, test.want)
+					}
+				})
+			}
+		}
 	}
 }
 
