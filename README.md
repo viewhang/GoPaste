@@ -73,7 +73,7 @@ The test covered storage and UI in a native window, without clipboard monitoring
 
 Download from [Releases](https://github.com/viewhang/GoPaste/releases):
 
-- macOS: choose Apple Silicon (arm64) or Intel (x64), extract the archive and move `GoPaste.app` to Applications
+- macOS: open the `.dmg` for Apple Silicon or Intel and drag `GoPaste.app` into Applications
 - Windows: run the x64 Setup installer
 
 Press `Command+Shift+V` on macOS or `Ctrl+Shift+V` on Windows to show or hide the panel. Panel layout, shortcuts and exclusion rules are configurable in Settings.
@@ -120,10 +120,10 @@ go tool mygo i18n check
 
 ```bash
 # macOS Apple Silicon
-go run ./tools/package -arch arm64 -o build/darwin-arm64 -release
+go tool mygo build -platform darwin/arm64 -o build
 
 # macOS Intel x64
-go run ./tools/package -arch amd64 -o build/darwin-amd64 -release
+go tool mygo build -platform darwin/amd64 -o build
 
 # Windows x64
 go tool mygo build -platform windows/amd64 -o build
@@ -131,7 +131,7 @@ go tool mygo build -platform windows/amd64 -o build
 
 Binaries, installers and update files are written to `build/<platform>-<architecture>/`.
 
-Local macOS builds require `macos.signingIdentity` in `mygo.json`. Update archives also require `updates.privateKey` or `MYGO_UPDATER_PRIVATE_KEY`.
+On a Mac, these commands build a DMG with the configured local certificate. For personal builds or sharing with people you trust, use `-sign -` if you do not have that certificate. For example, `go tool mygo build -sign -` builds an ad hoc signed app for the current Mac in a DMG. To also generate signed update archives, provide the MyGo update key via `MYGO_UPDATER_PRIVATE_KEY` or set `updates.privateKey` to a local key file.
 
 Official releases use the [Release workflow](.github/workflows/release.yml). Update `version` in `mygo.json`, commit it, then push the matching tag. Replace `<version>` below with the committed version:
 
@@ -140,6 +140,8 @@ git tag -a "v<version>" -m "GoPaste v<version>"
 git push origin main "v<version>"
 ```
 
-The workflow tests and builds macOS arm64, macOS amd64 and Windows amd64, creates the GitHub Release, and uploads application archives, the Windows installer, update manifests and delta updates.
+The workflow tests and builds macOS arm64, macOS amd64 and Windows amd64, creates the GitHub Release, and uploads macOS disk images, the Windows installer, update archives and manifests. MyGo also generates delta updates when a previous version is available and the patch is smaller than the full archive.
 
 The repository needs three Actions secrets: `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` and `MYGO_UPDATER_PRIVATE_KEY`. macOS packages use a local signing certificate and are not notarized by Apple.
+
+The local certificate has no Apple Team ID. `macos.entitlements` disables library validation so the app can load its bundled, signed SQLite library. Remove this exception if both are signed with the same Developer ID.

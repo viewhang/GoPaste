@@ -83,18 +83,16 @@ jobs:
       - name: 运行应用测试
         run: go test . ./internal/...
 
-      - name: 验证 macOS 打包工具
-        if: runner.os == 'macOS'
-        run: go test ./tools/package
-
       - name: 构建 macOS 应用与更新包
         if: runner.os == 'macOS'
         env:
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
           RELEASE_ARCH: ${{ matrix.arch }}
         run: |
-          go run ./tools/package -arch "$RELEASE_ARCH" -o "build/darwin-$RELEASE_ARCH" -release
-          codesign --verify --deep --strict "build/darwin-$RELEASE_ARCH/GoPaste.app"
+          go tool mygo build -platform "darwin/$RELEASE_ARCH" -o build
+          app="build/darwin-$RELEASE_ARCH/GoPaste.app"
+          identity=$(node -p 'require("./mygo.json").macos.signingIdentity')
+          codesign --verify --deep --strict "-R=certificate leaf = H\"$identity\"" "$app" "$app/Contents/Resources/libSqlitecore.dylib"
 
       - name: 构建 Windows Setup 与更新包
         if: runner.os == 'Windows'
@@ -107,6 +105,7 @@ jobs:
         with:
           name: GoPaste-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
+            build/${{ matrix.platform }}-${{ matrix.arch }}/*.dmg
             build/${{ matrix.platform }}-${{ matrix.arch }}/*.tar.gz
             build/${{ matrix.platform }}-${{ matrix.arch }}/*.delta
             build/${{ matrix.platform }}-${{ matrix.arch }}/update-*.json
@@ -143,20 +142,16 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           支持 macOS Apple Silicon、macOS Intel 和 Windows x64
 
-          - macOS：下载对应架构的 `.tar.gz`，解压后将 `GoPaste.app` 放入应用程序目录，自动粘贴需要辅助功能权限
+          - macOS：打开对应架构的 `.dmg`，将 `GoPaste.app` 拖入 Applications，自动粘贴需要辅助功能权限
           - Windows：下载并运行 `gopaste-setup-<版本>-amd64.exe` 安装包
-          - `update-*.json` 和 Windows `.tar.gz` 归档用于自动更新
+          - `update-*.json`、`.tar.gz` 和 `.delta` 用于自动更新
 
           默认快捷键：macOS `Command+Shift+V`，Windows `Ctrl+Shift+V`
 
           macOS 应用使用本地证书签名，未经过 Apple 公证
 
-          If you cannot launch GoPaste on macOS after moving it to `/Applications`, try running the following command in Terminal
-          安装完成后，如果在 macOS 下无法启动 GoPaste，请尝试在终端执行以下命令
-
-          ```bash
-          sudo xattr -d com.apple.quarantine /Applications/GoPaste.app
-          ```
+          首次打开时，若系统提示无法验证开发者，确认来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。
+          If macOS cannot verify the developer on first launch, confirm you trust the source and choose Open Anyway in System Settings → Privacy & Security.
           NOTES
           previous_tag="$(git tag --merged "$RELEASE_TAG^" --sort=-version:refname --list 'v*' | head -n 1)"
           printf '\n## 更新日志 / Changelog\n\n' >> "$RUNNER_TEMP/release-notes.md"

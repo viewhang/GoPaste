@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"image"
 	"log"
-	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -154,11 +152,7 @@ func NewApp() *App {
 func (a *App) ready() {
 	a.updatesEnabled = mygo.Updater.Enabled()
 	dir, err := mygo.App.Path(mygo.PathUserData)
-	if err != nil || dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, "Library", "Application Support", "GoPaste")
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err != nil {
 		mygo.Dialog.Error(locales.CreateDataFailed(), err.Error())
 		return
 	}

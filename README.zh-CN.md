@@ -73,7 +73,7 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 
 在 [Releases](https://github.com/viewhang/GoPaste/releases) 下载：
 
-- macOS：选择 Apple Silicon（arm64）或 Intel（x64）版本，解压后将 `GoPaste.app` 放入应用程序目录
+- macOS：打开对应架构（Apple Silicon 或 Intel）的 `.dmg`，将 `GoPaste.app` 拖入 Applications
 - Windows：运行 x64 Setup 安装包
 
 默认按 `Command+Shift+V`（Windows 为 `Ctrl+Shift+V`）呼出或收起面板。面板形态、快捷键和排除规则可在设置中修改。
@@ -120,10 +120,10 @@ go tool mygo i18n check
 
 ```bash
 # macOS Apple Silicon
-go run ./tools/package -arch arm64 -o build/darwin-arm64 -release
+go tool mygo build -platform darwin/arm64 -o build
 
 # macOS Intel x64
-go run ./tools/package -arch amd64 -o build/darwin-amd64 -release
+go tool mygo build -platform darwin/amd64 -o build
 
 # Windows x64
 go tool mygo build -platform windows/amd64 -o build
@@ -131,7 +131,7 @@ go tool mygo build -platform windows/amd64 -o build
 
 各平台的程序、安装包和更新文件输出到对应的 `build/<平台>-<架构>/` 目录。
 
-本地 macOS 打包需要配置 `mygo.json` 中的 `macos.signingIdentity`；生成更新包还需要 `updates.privateKey` 或 `MYGO_UPDATER_PRIVATE_KEY`。
+在 Mac 上运行上述命令会使用项目配置的本地证书生成 DMG。没有该证书时，自用或小范围分享可加 `-sign -` 使用临时签名，例如 `go tool mygo build -sign -` 会构建当前 Mac 架构的 DMG。生成签名更新包时，通过 `MYGO_UPDATER_PRIVATE_KEY` 提供 MyGo 更新私钥，也可在本地配置 `updates.privateKey` 指向密钥文件。
 
 正式发布使用 [Release 工作流](.github/workflows/release.yml)：修改 `mygo.json` 的 `version` 并提交，再推送对应标签。将下面的 `<版本号>` 替换为已提交的版本号：
 
@@ -140,6 +140,8 @@ git tag -a "v<版本号>" -m "GoPaste v<版本号>"
 git push origin main "v<版本号>"
 ```
 
-工作流会测试并构建 macOS arm64、macOS amd64 和 Windows amd64，自动创建 GitHub Release，上传程序归档、Windows 安装包、自动更新清单与增量更新文件。
+工作流会测试并构建 macOS arm64、macOS amd64 和 Windows amd64，自动创建 GitHub Release，上传 macOS DMG、Windows 安装包、更新归档和清单。当有可用旧版本且增量包小于完整归档时，MyGo 还会生成增量更新文件。
 
 仓库需要配置 `MACOS_CERTIFICATE_P12`、`MACOS_CERTIFICATE_PASSWORD` 和 `MYGO_UPDATER_PRIVATE_KEY` 三项 Actions secrets。macOS 发布包使用本地证书签名，未经过 Apple 公证。
+
+本地签名证书没有 Apple Team ID，应用通过 `macos.entitlements` 关闭动态库的 Team ID 校验，以加载随包签名的 SQLite 库。若改用同一 Developer ID 签名应用与动态库，可移除此例外。
