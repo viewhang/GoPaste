@@ -87,8 +87,13 @@ jobs:
           path-type: inherit
           install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-pkgconf
 
-      - name: 运行应用测试
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+      - name: 运行 macOS 应用测试
+        if: runner.os == 'macOS'
+        run: tools/with-sqlcipher go test ./...
+
+      - name: 运行 Windows 应用测试
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: tools/with-sqlcipher go test ./...
 
       - name: 构建 macOS 应用与更新包
@@ -165,7 +170,7 @@ jobs:
           首次打开时，若系统提示无法验证开发者，确认来源可信后，可在「系统设置 → 隐私与安全性」选择「仍要打开」。
           If macOS cannot verify the developer on first launch, confirm you trust the source and choose Open Anyway in System Settings → Privacy & Security.
           NOTES
-          previous_tag="$(git tag --merged "$RELEASE_TAG^" --sort=-version:refname --list 'v*' | head -n 1)"
+          previous_tag="$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // ""')"
           printf '\n## 更新日志 / Changelog\n\n' >> "$RUNNER_TEMP/release-notes.md"
           git log --no-merges --format='- %s (%h)' "${previous_tag:+$previous_tag..}$RELEASE_TAG" >> "$RUNNER_TEMP/release-notes.md"
           gh release create "$RELEASE_TAG" release/* --verify-tag --title "GoPaste $RELEASE_TAG" --notes-file "$RUNNER_TEMP/release-notes.md"
