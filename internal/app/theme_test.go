@@ -14,7 +14,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -334,7 +333,7 @@ func TestGlassSwitchDrag(t *testing.T) {
 
 // TestThemeSwitchAndPersistence 验证设置中切换主题会改变面板绘制并保存选择
 func TestThemeSwitchAndPersistence(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +364,7 @@ func TestThemeSwitchAndPersistence(t *testing.T) {
 			t.Fatalf("主题 %s 的面板绘制未正确切换", choice.label)
 		}
 	}
-	reopened, err := store.Open(st.Dir())
+	reopened, err := openTestStore(st.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +463,7 @@ func TestGlassFloatingHeader(t *testing.T) {
 	for _, dark := range []bool{false, true} {
 		for _, size := range []struct{ w, h int }{{panelWidth, panelHeight}, {panelMinWidth, panelMinHeight}} {
 			t.Run(fmt.Sprintf("dark-%v-size-%dx%d", dark, size.w, size.h), func(t *testing.T) {
-				st, err := store.Open(t.TempDir())
+				st, err := openTestStore(t.TempDir())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -605,7 +604,7 @@ func TestGlassSettingsHeader(t *testing.T) {
 			{720, 520, ui.TitleBar{Height: 48, Right: 138}},
 		} {
 			t.Run(fmt.Sprintf("dark-%v-size-%dx%d", dark, size.w, size.h), func(t *testing.T) {
-				st, err := store.Open(t.TempDir())
+				st, err := openTestStore(t.TempDir())
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -169,16 +169,18 @@ func markdownImageRecord(rec *types.Record) bool {
 
 // pasteAs 按指定格式粘贴并在文件权限不足时提供保留格式的授权重试
 func (a *App) pasteAs(rec *types.Record, format pasteFormat) {
-	data, err := a.pasteAsData(rec, format)
+	data, err := a.pasteAsData(rec, format, a.exportImage)
 	if err != nil {
 		a.pasteError(rec, err, func() { a.pasteAs(rec, format) })
 		return
 	}
-	a.pasteData(rec.ID, data)
+	if len(data.Items()) != 0 {
+		a.pasteData(rec.ID, data)
+	}
 }
 
-// pasteAsData 按需加载完整记录并生成纯文本、Markdown、命名格式或文件信息
-func (a *App) pasteAsData(rec *types.Record, format pasteFormat) (transfer.Data, error) {
+// pasteAsData 按需加载记录并使用用户导出的图片生成路径或 Markdown
+func (a *App) pasteAsData(rec *types.Record, format pasteFormat, exportImage func(*types.Record) string) (transfer.Data, error) {
 	if format == pastePlainText {
 		return a.clipboardData(rec, true)
 	}
@@ -186,19 +188,20 @@ func (a *App) pasteAsData(rec *types.Record, format pasteFormat) (transfer.Data,
 	if rec == nil {
 		return transfer.Data{}, fs.ErrNotExist
 	}
+	if rec.Kind == types.KindImage && (format == pasteMarkdown || format == pasteFilePath) {
+		path := exportImage(rec)
+		if path == "" {
+			return transfer.Data{}, nil
+		}
+		rec = &types.Record{Kind: types.KindFile, Files: []types.FileRef{{Path: path}}}
+	}
 	var text string
 	switch format {
 	case pasteMarkdown:
 		switch {
 		case markdownImageRecord(rec):
-			var path string
-			label := locales.ImageKind()
-			if rec.Kind == types.KindImage {
-				path = a.st.BlobPath(rec.Image)
-			} else {
-				path = rec.Files[0].Path
-				label = filepath.Base(path)
-			}
+			path := rec.Files[0].Path
+			label := filepath.Base(path)
 			if _, err := os.Stat(path); err != nil {
 				if errors.Is(err, fs.ErrNotExist) {
 					return transfer.Data{}, errors.New(locales.ImageFileMissing())
@@ -248,7 +251,7 @@ func (a *App) pasteAsData(rec *types.Record, format pasteFormat) (transfer.Data,
 	case pasteFileName, pasteFileStem, pasteFilePath:
 		files := rec.Files
 		if rec.Kind == types.KindImage {
-			files = []types.FileRef{{Path: a.st.BlobPath(rec.Image)}}
+			files = []types.FileRef{{Path: rec.Image}}
 		}
 		values := make([]string, len(files))
 		for i, file := range files {

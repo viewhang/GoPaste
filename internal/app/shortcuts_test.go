@@ -5,13 +5,12 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
 // TestShortcutRecorder 验证默认呼出键、录制、冲突拦截、取消与快捷键持久化
 func TestShortcutRecorder(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +40,7 @@ func TestShortcutRecorder(t *testing.T) {
 	if a.recording != "" {
 		t.Fatal("Esc 未取消录制")
 	}
-	reopened, err := store.Open(st.Dir())
+	reopened, err := openTestStore(st.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}

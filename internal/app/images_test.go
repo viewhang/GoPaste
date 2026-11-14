@@ -15,7 +15,6 @@ import (
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -45,7 +44,7 @@ func TestImageBudget(t *testing.T) {
 
 // TestImageSizesAndLifetime 验证屏幕倍率、预览预算及关闭与隐藏后的缓存释放
 func TestImageSizesAndLifetime(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +83,7 @@ func TestImageSizesAndLifetime(t *testing.T) {
 
 // TestImageResizeReuse 验证连续缩放只保留一份缩略图且缩小时复用位图
 func TestImageResizeReuse(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +140,7 @@ func TestAnimatedPreview(t *testing.T) {
 
 // testAnimatedPreview 验证图片记录、原始文件及扩展名不符文件的动画预览
 func testAnimatedPreview(t *testing.T, data []byte, format string) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +237,7 @@ func TestGIFFileActualFormat(t *testing.T) {
 
 // TestLazyImageDrag 验证图片只在拖拽目标请求时读取且使用原始文件
 func TestLazyImageDrag(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,14 +249,13 @@ func TestLazyImageDrag(t *testing.T) {
 	a := NewApp()
 	a.st = st
 	data := a.dragData(&types.Record{Kind: types.KindImage, Image: name})
-	want := []byte("original image at request time")
-	if err := os.WriteFile(st.BlobPath(name), want, 0o644); err != nil {
+	if err := os.Remove(st.BlobPath(name)); err != nil {
 		t.Fatal(err)
 	}
-	got, err := data.Read(transfer.PNG)
-	if err != nil || !bytes.Equal(got, want) {
-		t.Fatalf("图片在请求前被读取或发生变化：%q，%v", got, err)
+	if _, err := data.Read(transfer.PNG); err == nil {
+		t.Fatal("拖拽提前缓存了已删除图片")
 	}
+
 }
 
 // TestCompactDragPreview 验证两种面板仅在开始拖拽时生成固定小尺寸预览
@@ -301,7 +299,7 @@ func TestCompactDragPreview(t *testing.T) {
 
 // TestBarVisibleImages 验证屏幕外卡片不会解码且滚动范围保持完整
 func TestBarVisibleImages(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,7 +13,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -45,7 +44,7 @@ func TestPasteAsText(t *testing.T) {
 	} {
 		rec := &types.Record{ID: "original", Kind: types.KindText, Text: tc.text, HTML: "<b>原文</b>"}
 		original := *rec
-		data, err := a.pasteAsData(rec, tc.format)
+		data, err := a.pasteAsData(rec, tc.format, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -72,7 +71,7 @@ func TestPasteAsColor(t *testing.T) {
 		{pasteColorRGB, "rgb(255, 0, 0)"},
 		{pasteColorHSL, "hsl(360, 100%, 50%)"},
 	} {
-		data, err := a.pasteAsData(rec, tc.format)
+		data, err := a.pasteAsData(rec, tc.format, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,10 +82,10 @@ func TestPasteAsColor(t *testing.T) {
 	}
 }
 
-// TestPasteAsMarkdown 验证完整链接、特殊字符及本地图片路径的 Markdown 转换
+// TestPasteAsMarkdown 验证完整链接的 Markdown 转义与剪贴板图片的导出路径
 func TestPasteAsMarkdown(t *testing.T) {
 	t.Setenv("MYGO_LOCALE", "zh-Hans")
-	st, err := store.Open(filepath.Join(t.TempDir(), "图片 (test) & raw"))
+	st, err := openTestStore(filepath.Join(t.TempDir(), "图片 (test) & raw"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +100,7 @@ func TestPasteAsMarkdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	summary := &types.Record{ID: link.ID, Kind: types.KindLink, Summary: true, Title: "摘要"}
-	data, err := a.pasteAsData(summary, pasteMarkdown)
+	data, err := a.pasteAsData(summary, pasteMarkdown, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +112,7 @@ func TestPasteAsMarkdown(t *testing.T) {
 		t.Fatal("转换修改了数据库内的原记录")
 	}
 	link.Title = ""
-	data, err = a.pasteAsData(link, pasteMarkdown)
+	data, err = a.pasteAsData(link, pasteMarkdown, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,24 +124,23 @@ func TestPasteAsMarkdown(t *testing.T) {
 		t.Fatal(err)
 	}
 	image := &types.Record{Kind: types.KindImage, Image: name}
-	data, err = a.pasteAsData(image, pasteMarkdown)
-	if err != nil {
+	exported := filepath.Join(t.TempDir(), "saved.png")
+	if err := os.WriteFile(exported, sampleIcon(), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	text, _ = data.Read(transfer.Text)
-	if !strings.HasPrefix(string(text), "![图片](<file:///") || !strings.HasSuffix(string(text), ">)") || !slices.Equal(data.Formats(), []transfer.Format{transfer.Text}) {
-		t.Fatalf("图片未生成纯文本 Markdown 文件引用：%q，格式 %v", text, data.Formats())
-	}
-	target := strings.TrimSuffix(strings.TrimPrefix(string(text), "![图片](<"), ">)")
-	uri, err := url.Parse(strings.ReplaceAll(target, `\&`, "&"))
-	if err != nil || strings.TrimPrefix(uri.Path, "/") != strings.TrimPrefix(filepath.ToSlash(st.BlobPath(name)), "/") {
-		t.Fatalf("图片引用未保留原路径：%q，%v", target, err)
-	}
-	if err := os.Remove(st.BlobPath(name)); err != nil {
-		t.Fatal(err)
-	}
-	if data, err := a.pasteAsData(image, pasteMarkdown); err == nil || len(data.Items()) != 0 {
-		t.Fatal("图片丢失时仍生成了粘贴内容")
+	for _, format := range []pasteFormat{pasteMarkdown, pasteFilePath} {
+		data, err = a.pasteAsData(image, format, func(*types.Record) string { return "" })
+		if err != nil || len(data.Items()) != 0 {
+			t.Fatalf("取消导出后仍执行了粘贴：%v", err)
+		}
+		data, err = a.pasteAsData(image, format, func(*types.Record) string { return exported })
+		if err != nil {
+			t.Fatal(err)
+		}
+		text, err = data.Read(transfer.Text)
+		if err != nil || format == pasteFilePath && string(text) != exported || format == pasteMarkdown && !strings.HasPrefix(string(text), "![saved.png](<file:") {
+			t.Fatalf("未引用导出的图片：%q，%v", text, err)
+		}
 	}
 }
 
@@ -169,7 +167,7 @@ func TestPasteAsImageFile(t *testing.T) {
 	if err := tt.ChooseMenuItem(locales.PasteAs(), "Markdown"); err != nil || len(a.pending) != 1 {
 		t.Fatalf("Finder 图片文件未提供 Markdown 粘贴入口：%v", err)
 	}
-	data, err := a.pasteAsData(rec, pasteMarkdown)
+	data, err := a.pasteAsData(rec, pasteMarkdown, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +184,7 @@ func TestPasteAsImageFile(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if data, err := a.pasteAsData(rec, pasteMarkdown); err == nil || len(data.Items()) != 0 {
+	if data, err := a.pasteAsData(rec, pasteMarkdown, nil); err == nil || len(data.Items()) != 0 {
 		t.Fatal("原图片文件丢失后仍生成粘贴内容")
 	}
 }
@@ -214,7 +212,7 @@ func TestPasteAsFileInfo(t *testing.T) {
 	}
 	check := func(rec *types.Record, format pasteFormat, want string) {
 		t.Helper()
-		data, err := a.pasteAsData(rec, format)
+		data, err := a.pasteAsData(rec, format, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +231,6 @@ func TestPasteAsFileInfo(t *testing.T) {
 	image := &types.Record{Kind: types.KindImage, Image: name}
 	check(image, pasteFileName, name)
 	check(image, pasteFileStem, strings.TrimSuffix(name, ".png"))
-	check(image, pasteFilePath, a.st.BlobPath(name))
 }
 
 // TestPasteAsFileMenu 验证图片、视频及普通文件在卡片和预览中共用文件信息粘贴菜单

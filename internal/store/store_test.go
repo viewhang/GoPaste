@@ -25,7 +25,7 @@ func openTest(t *testing.T) *Store {
 	t.Helper()
 	dir := filepath.Join("..", "..", ".mygo", "storetest")
 	_ = os.RemoveAll(dir)
-	s, err := Open(dir)
+	s, err := openTestStore(dir)
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -39,7 +39,7 @@ func imageRecord(hash string) *types.Record {
 
 // TestMoveToFront 验证移至最前保留记录信息、其他记录顺序与重启后的排序
 func TestMoveToFront(t *testing.T) {
-	s, err := Open(t.TempDir())
+	s, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestMoveToFront(t *testing.T) {
 	if list[0].ID != one.ID || list[0].Text != one.Text || !list[0].CreatedAt.Equal(created) || list[0].ListID != "work" {
 		t.Fatal("调整顺序改变了记录信息")
 	}
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestPruneRemovesBlob(t *testing.T) {
 
 // TestPruneKeepsManualLists 验证普通列表免于自动清理且不占历史配额，移出后恢复清理
 func TestPruneKeepsManualLists(t *testing.T) {
-	st, err := Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestPruneKeepsManualLists(t *testing.T) {
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(st.Dir())
+	reopened, err := openTestStore(st.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestCollectGarbage(t *testing.T) {
 // TestPasteAsShortcutMigration 验证旧纯文本快捷键迁移后保留自定义按键且不改写输入设置
 func TestPasteAsShortcutMigration(t *testing.T) {
 	for _, current := range []string{"", "Alt+P"} {
-		s, err := Open(t.TempDir())
+		s, err := openTestStore(t.TempDir())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,7 +262,7 @@ func TestPasteAsShortcutMigration(t *testing.T) {
 		if err := s.Close(); err != nil {
 			t.Fatal(err)
 		}
-		s, err = Open(dir)
+		s, err = openTestStore(dir)
 		if err != nil {
 			t.Fatal(err)
 		}

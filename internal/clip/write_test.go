@@ -9,7 +9,6 @@ import (
 	"github.com/egoist/mygo/transfer"
 
 	"gopaste/internal/native"
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -43,7 +42,7 @@ func TestOwnClipboardMarker(t *testing.T) {
 
 // TestCaptureAfterOwnWrite 验证自身写入后立即复制仍被记录并沿用当前排除规则
 func TestCaptureAfterOwnWrite(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

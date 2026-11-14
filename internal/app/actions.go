@@ -196,12 +196,12 @@ func (a *App) remove(rec *types.Record) {
 	}
 }
 
-// exportImage 将图片记录保存到用户选择的文件
-func (a *App) exportImage(rec *types.Record) {
+// exportImage 将图片记录保存到用户选择的文件并返回导出路径
+func (a *App) exportImage(rec *types.Record) string {
 	data, err := a.st.ReadBlob(rec.Image)
 	if err != nil {
 		a.toast(locales.ImageFileMissing())
-		return
+		return ""
 	}
 	ext := rec.ImageFormat
 	if ext == "" {
@@ -213,13 +213,14 @@ func (a *App) exportImage(rec *types.Record) {
 		Filters:     []mygo.FileFilter{{Name: locales.ImageFilter(strings.ToUpper(ext)), Extensions: []string{ext}}},
 	})
 	if err != nil || dest == "" {
-		return
+		return ""
 	}
 	if err := os.WriteFile(dest, data, 0o644); err != nil {
 		a.toast(err.Error())
-		return
+		return ""
 	}
 	a.notify(locales.Exported())
+	return dest
 }
 
 // openPreview 按需读取完整记录并打开预览

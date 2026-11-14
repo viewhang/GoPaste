@@ -44,7 +44,7 @@ macOS 和 Windows 剪贴板管理器，使用 Go 和 [MyGo](https://github.com/e
 本项目使用 [MyGo](https://github.com/egoist/mygo) 的原生界面：
 
 - Go 编写的 GPU 渲染界面，无需 WebView、HTML 或 JavaScript
-- 无需 cgo，同一份代码可交叉编译到 macOS 和 Windows
+- macOS 和 Windows 共用原生界面代码，加密存储通过 cgo 接入 SQLCipher
 - 提供剪贴板、托盘、全局快捷键、拖拽和签名更新等桌面接口
 - 界面可直接测试和渲染为截图，无需打开窗口
 
@@ -82,7 +82,7 @@ macOS 自动粘贴需要在「系统设置 → 隐私与安全性 → 辅助功�
 
 设置分为通用、快捷键、排除规则、高级和关于。历史限制与复制提示音位于通用，粘贴行为与数据管理位于高级，更新镜像与自动更新位于关于。
 
-选中记录后按 `Shift+Enter`，或在右键菜单中选择「粘贴为」，可按记录类型转换后粘贴。图片的 Markdown 格式引用本地文件。
+选中记录后按 `Shift+Enter`，或在右键菜单中选择「粘贴为」，可按记录类型转换后粘贴。剪贴板图片选择「文件路径」或 Markdown 时，会提示选择导出位置，然后粘贴该文件的路径或链接。
 
 | 快捷键 | 操作 |
 | --- | --- |
@@ -100,13 +100,17 @@ macOS 自动粘贴需要在「系统设置 → 隐私与安全性 → 辅助功�
 
 按住 Command（Windows 为 Ctrl）时显示快速粘贴编号。设置 → 关于中可检查更新、开启自动检查或自动下载安装。
 
+## 历史加密
+
+GoPaste 使用 SQLCipher 加密历史、搜索索引和设置，使用 AES-256-GCM 加密图片、预览和应用图标。首次启动自动生成密钥并存入 macOS 钥匙串或 Windows 凭据管理器，无需设置密码，系统可能提示授权。升级时会自动迁移旧历史。恢复备份需要同时保留数据目录和对应的系统凭据。系统剪贴板和主动导出的文件仍可供接收方读取。
+
 ## 开发
 
-需要 Go 1.27.3。
+请在目标系统和架构上使用 Go 1.27.3 构建。macOS 支持 13 及以上，编译需要 Xcode 命令行工具。Windows 在 MSYS2 UCRT64 终端中安装 `mingw-w64-ucrt-x86_64-{gcc,openssl,pkgconf}` 后构建。脚本会静态链接 OpenSSL。
 
 ```bash
-CGO_ENABLED=0 go run .
-CGO_ENABLED=0 go test ./...
+tools/with-sqlcipher go run .
+tools/with-sqlcipher go test ./...
 ```
 
 界面文案位于 `internal/locales/`，修改后运行：
@@ -120,18 +124,18 @@ go tool mygo i18n check
 
 ```bash
 # macOS Apple Silicon
-go tool mygo build -platform darwin/arm64 -o build
+tools/with-sqlcipher go tool mygo build -platform darwin/arm64 -o build
 
 # macOS Intel x64
-go tool mygo build -platform darwin/amd64 -o build
+tools/with-sqlcipher go tool mygo build -platform darwin/amd64 -o build
 
 # Windows x64
-go tool mygo build -platform windows/amd64 -o build
+tools/with-sqlcipher go tool mygo build -platform windows/amd64 -o build
 ```
 
 各平台的程序、安装包和更新文件输出到对应的 `build/<平台>-<架构>/` 目录。
 
-在 Mac 上运行上述命令会使用项目配置的本地证书生成 DMG。没有该证书时，自用或小范围分享可加 `-sign -` 使用临时签名，例如 `go tool mygo build -sign -` 会构建当前 Mac 架构的 DMG。生成签名更新包时，通过 `MYGO_UPDATER_PRIVATE_KEY` 提供 MyGo 更新私钥，也可在本地配置 `updates.privateKey` 指向密钥文件。
+在 Mac 上运行上述命令会使用项目配置的本地证书生成 DMG。没有该证书时，自用或小范围分享可加 `-sign -` 使用临时签名，例如 `tools/with-sqlcipher go tool mygo build -sign -` 会构建当前 Mac 架构的 DMG。生成签名更新包时，通过 `MYGO_UPDATER_PRIVATE_KEY` 提供 MyGo 更新私钥，也可在本地配置 `updates.privateKey` 指向密钥文件。
 
 正式发布使用 [Release 工作流](.github/workflows/release.yml)：修改 `mygo.json` 的 `version` 并提交，再推送对应标签。将下面的 `<版本号>` 替换为已提交的版本号：
 
@@ -143,5 +147,3 @@ git push origin main "v<版本号>"
 工作流会测试并构建 macOS arm64、macOS amd64 和 Windows amd64，自动创建 GitHub Release，上传 macOS DMG、Windows 安装包、更新归档和清单。当有可用旧版本且增量包小于完整归档时，MyGo 还会生成增量更新文件。
 
 仓库需要配置 `MACOS_CERTIFICATE_P12`、`MACOS_CERTIFICATE_PASSWORD` 和 `MYGO_UPDATER_PRIVATE_KEY` 三项 Actions secrets。macOS 发布包使用本地证书签名，未经过 Apple 公证。
-
-本地签名证书没有 Apple Team ID，应用通过 `macos.entitlements` 关闭动态库的 Team ID 校验，以加载随包签名的 SQLite 库。若改用同一 Developer ID 签名应用与动态库，可移除此例外。

@@ -1,7 +1,6 @@
 package store
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -10,52 +9,44 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/egoist/mygo/plugins/sqlite"
-
 	"gopaste/internal/types"
 )
 
 // openDatabase 创建数据库并将旧版历史与设置一次性原子迁移
-func (s *Store) openDatabase() (err error) {
-	ctx := context.Background()
-	s.db, err = sqlite.Open(ctx, filepath.Join(s.dir, databaseFile), sqlite.OpenOptions{})
-	if err != nil {
-		return err
-	}
+func (s *Store) openDatabase() (version int, err error) {
+	s.db = connectDatabase(filepath.Join(s.dir, databaseFile), s.cipher.database)
 	defer func() {
 		if err != nil {
 			s.db.Close()
 		}
 	}()
-	rows, err := s.db.Query(ctx, "PRAGMA user_version")
-	if err != nil {
-		return err
+	if err := s.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		return 0, err
 	}
-	version := rows.Values[0][0].(int64)
-	if version > 2 {
-		return errors.New("store: unsupported database version")
+	if version > schemaVersion {
+		return 0, errors.New("store: unsupported database version")
 	}
-	if _, err = s.db.Execute(ctx, "PRAGMA journal_mode=WAL"); err != nil {
-		return err
+	if _, err = s.db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return 0, err
 	}
-	var statements []sqlite.Statement
+	var statements []statement
 	if version == 0 {
-		statements = []sqlite.Statement{
+		statements = []statement{
 			{SQL: `CREATE TABLE records (id TEXT PRIMARY KEY, position INTEGER NOT NULL, kind TEXT NOT NULL, list_id TEXT NOT NULL, meta TEXT NOT NULL, summary TEXT NOT NULL, payload TEXT NOT NULL, search TEXT NOT NULL, extensions TEXT NOT NULL)`},
 			{SQL: "CREATE INDEX records_order ON records(position DESC)"},
 			{SQL: "CREATE INDEX records_list ON records(list_id, position DESC)"},
 		}
 		data, readErr := os.ReadFile(filepath.Join(s.dir, indexFile))
 		if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-			return readErr
+			return 0, readErr
 		}
 		if readErr == nil {
 			var idx index
 			if err = json.Unmarshal(data, &idx); err != nil {
-				return err
+				return 0, err
 			}
 			if idx.Version != 1 {
-				return errors.New("store: unsupported history index")
+				return 0, errors.New("store: unsupported history index")
 			}
 			for i, r := range idx.Records {
 				if r == nil || r.ID == "" {
@@ -66,7 +57,7 @@ func (s *Store) openDatabase() (err error) {
 				}
 				statement, e := recordStatement(r, int64(len(idx.Records)-i))
 				if e != nil {
-					return e
+					return 0, e
 				}
 				statements = append(statements, statement)
 			}
@@ -75,77 +66,73 @@ func (s *Store) openDatabase() (err error) {
 	if version < 2 {
 		data, readErr := os.ReadFile(filepath.Join(s.dir, legacySettingsFile))
 		if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-			return readErr
+			return 0, readErr
 		}
 		if readErr == nil {
 			s.settings.ExcludedAppsInitialized = false
 			if err = json.Unmarshal(data, &s.settings); err != nil {
-				return err
+				return 0, err
 			}
 		}
 		normalizeSettings(&s.settings)
-		statement, e := settingsStatement(s.settings)
+		settingsRow, e := settingsStatement(s.settings)
 		if e != nil {
-			return e
+			return 0, e
 		}
 		statements = append(statements,
-			sqlite.Statement{SQL: "CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)"},
-			statement,
-			sqlite.Statement{SQL: "PRAGMA user_version=2"},
+			statement{SQL: "CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)"},
+			settingsRow,
+			statement{SQL: "PRAGMA user_version=2"},
 		)
-		if _, err = s.db.Transaction(ctx, statements); err != nil {
-			return err
+		if err = transaction(s.db, statements); err != nil {
+			return 0, err
 		}
 	}
-	rows, err = s.db.Query(ctx, "SELECT data FROM settings WHERE id=1")
-	if err != nil {
-		return err
+	var data []byte
+	if err := s.db.QueryRow("SELECT data FROM settings WHERE id=1").Scan(&data); err != nil {
+		return 0, err
 	}
-	if len(rows.Values) == 0 {
-		return errors.New("store: missing settings")
-	}
-	if err = json.Unmarshal([]byte(rows.Values[0][0].(string)), &s.settings); err != nil {
-		return err
+	if err := json.Unmarshal(data, &s.settings); err != nil {
+		return 0, err
 	}
 	normalizeSettings(&s.settings)
-	// 迁移提交后移除旧文件，重启时以数据库为准
-	for _, name := range []string{indexFile, legacySettingsFile} {
-		if err = os.Remove(filepath.Join(s.dir, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return err
-		}
-	}
 	// 重置中断的链接预览以便下次调度
-	if _, err = s.db.Execute(ctx, `UPDATE records SET
+	if _, err = s.db.Exec(`UPDATE records SET
 		meta=json_remove(meta,'$.previewState'),
 		summary=json_remove(summary,'$.previewState'),
 		payload=json_remove(payload,'$.previewState')
 		WHERE json_extract(meta,'$.previewState')='loading'`); err != nil {
-		return err
+		return 0, err
 	}
-	rows, err = s.db.Query(ctx, "SELECT meta, position FROM records ORDER BY position DESC")
+	rows, err := s.db.Query("SELECT meta, position FROM records ORDER BY position DESC")
 	if err != nil {
-		return err
+		return 0, err
 	}
-	s.positions = make(map[string]int64, len(rows.Values))
-	for _, row := range rows.Values {
+	defer rows.Close()
+	s.positions = make(map[string]int64)
+	for rows.Next() {
+		var position int64
+		if err := rows.Scan(&data, &position); err != nil {
+			return 0, err
+		}
 		r := new(types.Record)
-		if err = json.Unmarshal([]byte(row[0].(string)), r); err != nil {
-			return err
+		if err = json.Unmarshal(data, r); err != nil {
+			return 0, err
 		}
 		s.records = append(s.records, r)
 		s.byID[r.ID] = r
-		s.positions[r.ID] = row[1].(int64)
+		s.positions[r.ID] = position
 	}
-	return nil
+	return version, rows.Err()
 }
 
 // settingsStatement 生成整份应用设置的原子保存语句
-func settingsStatement(settings types.Settings) (sqlite.Statement, error) {
+func settingsStatement(settings types.Settings) (statement, error) {
 	data, err := json.Marshal(settings)
 	if err != nil {
-		return sqlite.Statement{}, err
+		return statement{}, err
 	}
-	return sqlite.Statement{
+	return statement{
 		SQL:  "INSERT INTO settings(id,data) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
 		Args: []any{string(data)},
 	}, nil
@@ -157,14 +144,14 @@ func recordMeta(r *types.Record) *types.Record {
 }
 
 // recordStatement 生成单条记录及其有限摘要和大小写无关检索字段
-func recordStatement(r *types.Record, position int64) (sqlite.Statement, error) {
+func recordStatement(r *types.Record, position int64) (statement, error) {
 	payload, err := json.Marshal(r)
 	if err != nil {
-		return sqlite.Statement{}, err
+		return statement{}, err
 	}
 	meta, err := json.Marshal(recordMeta(r))
 	if err != nil {
-		return sqlite.Statement{}, err
+		return statement{}, err
 	}
 	summary := *r
 	summary.Text = summaryText(r.Text)
@@ -175,7 +162,7 @@ func recordStatement(r *types.Record, position int64) (sqlite.Statement, error) 
 	summary.Files = r.Files[:min(3, len(r.Files))]
 	preview, err := json.Marshal(summary)
 	if err != nil {
-		return sqlite.Statement{}, err
+		return statement{}, err
 	}
 	fields := []string{r.Text, r.Title, r.URL, r.Color, r.Source.AppName}
 	extensions := []string{}
@@ -202,7 +189,7 @@ func recordStatement(r *types.Record, position int64) (sqlite.Statement, error) 
 	}
 	search, _ := json.Marshal(fields)
 	exts, _ := json.Marshal(extensions)
-	return sqlite.Statement{SQL: `INSERT INTO records(id,position,kind,list_id,meta,summary,payload,search,extensions) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET position=excluded.position,kind=excluded.kind,list_id=excluded.list_id,meta=excluded.meta,summary=excluded.summary,payload=excluded.payload,search=excluded.search,extensions=excluded.extensions`, Args: []any{r.ID, position, string(r.Kind), r.ListID, string(meta), string(preview), string(payload), string(search), string(exts)}}, nil
+	return statement{SQL: `INSERT INTO records(id,position,kind,list_id,meta,summary,payload,search,extensions) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET position=excluded.position,kind=excluded.kind,list_id=excluded.list_id,meta=excluded.meta,summary=excluded.summary,payload=excluded.payload,search=excluded.search,extensions=excluded.extensions`, Args: []any{r.ID, position, string(r.Kind), r.ListID, string(meta), string(preview), string(payload), string(search), string(exts)}}, nil
 }
 
 // summaryText 截取卡片所需的前五百一十二个字符并保留截断提示
@@ -220,24 +207,29 @@ func summaryText(text string) string {
 
 // readRecordsLocked 从指定内容列读取记录
 func (s *Store) readRecordsLocked(column, clause string, args ...any) ([]*types.Record, error) {
-	rows, err := s.db.Query(context.Background(), "SELECT "+column+" FROM records "+clause, args...)
+	rows, err := s.db.Query("SELECT "+column+" FROM records "+clause, args...)
 	if err != nil {
 		return nil, err
 	}
-	records := make([]*types.Record, 0, len(rows.Values))
-	for _, row := range rows.Values {
+	defer rows.Close()
+	var records []*types.Record
+	for rows.Next() {
 		r := new(types.Record)
-		if err := json.Unmarshal([]byte(row[0].(string)), r); err != nil {
+		var data []byte
+		if err := rows.Scan(&data); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(data, r); err != nil {
 			return nil, err
 		}
 		r.Summary = column == "summary"
 		records = append(records, r)
 	}
-	return records, nil
+	return records, rows.Err()
 }
 
 // commitLocked 原子保存附加语句、记录与顺序，成功后更新元数据并回收资源
-func (s *Store) commitLocked(next []*types.Record, candidates map[string]int64, statements ...sqlite.Statement) error {
+func (s *Store) commitLocked(next []*types.Record, candidates map[string]int64, statements ...statement) error {
 	if candidates == nil {
 		candidates = make(map[string]int64)
 	}
@@ -264,7 +256,7 @@ func (s *Store) commitLocked(next []*types.Record, candidates map[string]int64, 
 			statements = append(statements, statement)
 			r = recordMeta(r)
 		} else if position != s.positions[r.ID] {
-			statements = append(statements, sqlite.Statement{SQL: "UPDATE records SET position=? WHERE id=?", Args: []any{position, r.ID}})
+			statements = append(statements, statement{SQL: "UPDATE records SET position=? WHERE id=?", Args: []any{position, r.ID}})
 		}
 		positions[r.ID] = position
 		kept[r.ID] = r
@@ -272,11 +264,11 @@ func (s *Store) commitLocked(next []*types.Record, candidates map[string]int64, 
 	}
 	for id := range s.byID {
 		if kept[id] == nil {
-			statements = append(statements, sqlite.Statement{SQL: "DELETE FROM records WHERE id=?", Args: []any{id}})
+			statements = append(statements, statement{SQL: "DELETE FROM records WHERE id=?", Args: []any{id}})
 		}
 	}
 	if len(statements) > 0 {
-		if _, err := s.db.Transaction(context.Background(), statements); err != nil {
+		if err := transaction(s.db, statements); err != nil {
 			return err
 		}
 	}
@@ -290,15 +282,20 @@ func (s *Store) IDs(tab types.Tab, query string) ([]*types.Record, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	where, args := queryClause(tab, query)
-	rows, err := s.db.Query(context.Background(), "SELECT id FROM records WHERE "+where+" ORDER BY position DESC", args...)
+	rows, err := s.db.Query("SELECT id FROM records WHERE "+where+" ORDER BY position DESC", args...)
 	if err != nil {
 		return nil, err
 	}
-	records := make([]*types.Record, 0, len(rows.Values))
-	for _, row := range rows.Values {
-		records = append(records, &types.Record{ID: row[0].(string)})
+	defer rows.Close()
+	var records []*types.Record
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		records = append(records, &types.Record{ID: id})
 	}
-	return records, nil
+	return records, rows.Err()
 }
 
 // Summaries 按指定标识批量读取当前页的卡片摘要

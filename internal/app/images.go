@@ -5,7 +5,6 @@ import (
 	"container/list"
 	"image"
 	"math"
-	"os"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -114,11 +113,20 @@ func (a *App) thumb(name string, size float32) *ui.Bitmap {
 	if b, ok := a.images.get(key); ok {
 		return b
 	}
-	img, err := native.Thumbnail(a.st.BlobPath(name), key.side)
+	img, err := a.blobThumbnail(name, key.side)
 	if err != nil {
 		return a.images.put(key, nil)
 	}
 	return a.images.put(key, ui.NewBitmap(img))
+}
+
+// blobThumbnail 解密资源并按目标尺寸生成缩略图
+func (a *App) blobThumbnail(name string, side int) (*image.RGBA, error) {
+	data, err := a.st.ReadBlob(name)
+	if err != nil {
+		return nil, err
+	}
+	return native.Thumbnail(data, side)
 }
 
 // previewBitmap 按尺寸档位降采样当前预览并在缩小时复用已有位图
@@ -129,7 +137,7 @@ func (a *App) previewBitmap(name string, size float32) *ui.Bitmap {
 	key := bitmapKey{name: name, side: bitmapSide(a.imagePixels(size), previewMaxSide)}
 	if a.previewImage.key.name != key.name || a.previewImage.key.side < key.side {
 		a.previewImage = cachedBitmap{key: key}
-		if img, err := native.Thumbnail(a.st.BlobPath(name), key.side); err == nil {
+		if img, err := a.blobThumbnail(name, key.side); err == nil {
 			a.previewImage.image = ui.NewBitmap(img)
 			a.previewImage.bytes = bitmapBytes(a.previewImage.image)
 		}
@@ -154,12 +162,12 @@ func (a *App) fileIcon(path string) *ui.Bitmap {
 }
 
 // previewImageFile 按文件实际格式复用 GIF 或 WebP 播放器或降采样静态预览
-func (a *App) previewImageFile(path string, size float32) (*ui.VideoPlayer, *ui.Bitmap) {
+func (a *App) previewImageFile(path string, size float32, read func(string) ([]byte, error)) (*ui.VideoPlayer, *ui.Bitmap) {
 	key := bitmapKey{name: path, side: bitmapSide(a.imagePixels(size), previewMaxSide)}
 	if a.previewMediaPath != path || a.previewImage.image != nil && a.previewImage.key.side < key.side {
 		a.releasePreview()
 		a.previewMediaPath = path
-		data, err := os.ReadFile(path)
+		data, err := read(path)
 		if err != nil {
 			return nil, nil
 		}
@@ -174,7 +182,7 @@ func (a *App) previewImageFile(path string, size float32) (*ui.VideoPlayer, *ui.
 		case format == "webp" && len(data) >= 30 && string(data[12:16]) == "VP8X" && data[20]&2 != 0:
 			decoder, err = newWebPDecoder(data)
 		default:
-			img, err := native.Thumbnail(path, key.side)
+			img, err := native.Thumbnail(data, key.side)
 			if err != nil {
 				return nil, nil
 			}

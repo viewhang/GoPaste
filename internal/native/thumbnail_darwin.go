@@ -42,7 +42,7 @@ func loadImageIO() {
 	imageIOOnce.Do(func() {
 		load()
 		lib := mustDlopen("/System/Library/Frameworks/ImageIO.framework/ImageIO")
-		purego.RegisterLibFunc(&imageSourceCreate, lib, "CGImageSourceCreateWithURL")
+		purego.RegisterLibFunc(&imageSourceCreate, lib, "CGImageSourceCreateWithData")
 		purego.RegisterLibFunc(&imageSourceThumbnail, lib, "CGImageSourceCreateThumbnailAtIndex")
 		purego.RegisterLibFunc(&imageWidth, libCG, "CGImageGetWidth")
 		purego.RegisterLibFunc(&imageHeight, libCG, "CGImageGetHeight")
@@ -60,16 +60,18 @@ func loadImageIO() {
 	})
 }
 
-// Thumbnail 从磁盘按最长边降采样图片并保留透明度与方向
-func Thumbnail(path string, maxSide int) (out *image.RGBA, err error) {
+// Thumbnail 从图片字节按最长边降采样图片并保留透明度与方向
+func Thumbnail(data []byte, maxSide int) (out *image.RGBA, err error) {
+	if len(data) == 0 {
+		return nil, errors.New("native: empty image")
+	}
 	loadImageIO()
 	withPool(func() {
-		str := nsString(path)
-		defer send(str, "release")
-		url := send(class("NSURL"), "fileURLWithPath:", uintptr(str))
+		raw := send(class("NSData"), "dataWithBytes:length:", uintptr(unsafe.Pointer(&data[0])), uintptr(len(data)))
+		runtime.KeepAlive(data)
 		opts := send(class("NSMutableDictionary"), "dictionary")
 		send(opts, "setObject:forKey:", cfFalse, imageIOKeys[0])
-		source := imageSourceCreate(uintptr(url), uintptr(opts))
+		source := imageSourceCreate(uintptr(raw), uintptr(opts))
 		if source == 0 {
 			err = errors.New("native: cannot open image")
 			return

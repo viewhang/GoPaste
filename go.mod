@@ -3,6 +3,7 @@ module gopaste
 go 1.27.3
 
 require (
+	github.com/0xCarbon/go-sqlite3 v1.15.1
 	github.com/ebitengine/purego v0.11.1
 	github.com/egoist/mygo v0.9.0
 	golang.org/x/image v0.46.0

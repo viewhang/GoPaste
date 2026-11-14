@@ -10,19 +10,14 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"os"
 
 	_ "golang.org/x/image/bmp"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 )
 
-// Thumbnail 从磁盘读取图片并保留方向按最长边缩小为 RGBA
-func Thumbnail(path string, maxSide int) (*image.RGBA, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+// Thumbnail 读取图片字节并保留方向按最长边缩小为 RGBA
+func Thumbnail(data []byte, maxSide int) (*image.RGBA, error) {
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err

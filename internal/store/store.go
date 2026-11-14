@@ -1,11 +1,12 @@
-// Package store 使用 SQLite 保存历史与设置，使用独立文件保存图片
+// Package store 使用 SQLCipher 保存历史与设置并加密资源文件
 package store
 
 import (
-	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"maps"
@@ -17,15 +18,19 @@ import (
 	"time"
 
 	"gopaste/internal/types"
-
-	"github.com/egoist/mygo/plugins/sqlite"
 )
 
 const (
 	// indexFile 标识待迁移的旧版历史文件
 	indexFile = "records.json"
+	// schemaVersion 标识已完成旧版资源迁移的数据库版本
+	schemaVersion = 3
+	// encryptedBlobs 标识加密资源目录
+	encryptedBlobs = "blobs.enc"
 	// databaseFile 标识历史与设置共用的数据库
-	databaseFile = "history.db"
+	databaseFile = "history.enc.db"
+	// legacyDatabaseFile 标识待加密的明文历史数据库
+	legacyDatabaseFile = "history.db"
 	// legacySettingsFile 标识待迁移的旧版设置文件
 	legacySettingsFile = "settings.json"
 )
@@ -37,7 +42,8 @@ type Store struct {
 	blobDir string
 	// records 仅缓存清理和去重需要的元数据，不保留正文与文件列表
 	records   []*types.Record
-	db        *sqlite.DB
+	db        *sql.DB
+	cipher    vaultCipher
 	positions map[string]int64
 	byID      map[string]*types.Record
 	settings  types.Settings
@@ -51,14 +57,22 @@ type index struct {
 	Records []*types.Record `json:"records"`
 }
 
-// Open 加载并迁移历史与设置，应用清理规则后回收孤立资源
-func Open(dir string) (*Store, error) {
-	s := &Store{dir: dir, blobDir: filepath.Join(dir, "blobs"), byID: map[string]*types.Record{}}
-	if err := os.MkdirAll(s.blobDir, 0o755); err != nil {
+// OpenWithKey 使用指定的仓库主密钥解锁并迁移历史与资源
+func OpenWithKey(dir string, key []byte) (*Store, error) {
+	v, err := newVaultCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	s := &Store{dir: dir, blobDir: filepath.Join(dir, encryptedBlobs), cipher: v, byID: map[string]*types.Record{}}
+	if err := os.MkdirAll(s.blobDir, 0o700); err != nil {
+		return nil, err
+	}
+	if err := migrateDatabase(dir, v.database); err != nil {
 		return nil, err
 	}
 	s.settings = types.DefaultSettings()
-	if err := s.openDatabase(); err != nil {
+	version, err := s.openDatabase()
+	if err != nil {
 		return nil, err
 	}
 	success := false
@@ -67,6 +81,18 @@ func Open(dir string) (*Store, error) {
 			s.db.Close()
 		}
 	}()
+	if version < schemaVersion {
+		if err := s.migrateBlobs(); err != nil {
+			return nil, err
+		}
+		if _, err := s.db.Exec(fmt.Sprintf("PRAGMA user_version=%d", schemaVersion)); err != nil {
+			return nil, err
+		}
+	} else if _, err := os.Stat(filepath.Join(dir, legacyDatabaseFile)); err == nil {
+		return nil, errors.New("检测到另一个版本写入的旧历史，请先备份两个数据库")
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
 	kept, err := s.pruneLocked(s.records)
 	if err != nil {
 		return nil, err
@@ -143,7 +169,7 @@ func (s *Store) SetSettings(st types.Settings) error {
 	}
 	prev := s.settings
 	if st.MaxRecords == prev.MaxRecords && st.RetentionDays == prev.RetentionDays && st.HistoryLimitMiB == prev.HistoryLimitMiB {
-		if _, err := s.db.Execute(context.Background(), statement.SQL, statement.Args...); err != nil {
+		if _, err := s.db.Exec(statement.SQL, statement.Args...); err != nil {
 			return err
 		}
 		s.settings = st
@@ -389,21 +415,28 @@ func (s *Store) SaveBlob(data []byte, ext string) (string, error) {
 	return name, s.saveBlobLocked(data, name)
 }
 
-// BlobPath 返回合法资源文件的绝对路径
+// BlobPath 返回加密资源的存储路径
 func (s *Store) BlobPath(name string) string {
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
 		return ""
 	}
-	return filepath.Join(s.blobDir, name)
+	return filepath.Join(s.blobDir, s.cipher.diskName(name))
 }
 
-// ReadBlob 读取资源原始字节
+// ReadBlob 校验并解密资源原始字节
 func (s *Store) ReadBlob(name string) ([]byte, error) {
 	p := s.BlobPath(name)
 	if p == "" {
 		return nil, errors.New("store: bad blob name")
 	}
-	return os.ReadFile(p)
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 || data[0] != blobVersion {
+		return nil, errors.New("store: invalid encrypted resource format")
+	}
+	return s.cipher.blob.Open(nil, nil, data[1:], []byte(name))
 }
 
 // CollectGarbage 在存储锁内清理无记录引用的资源与写入临时文件
@@ -413,7 +446,10 @@ func (s *Store) CollectGarbage() int {
 	if s.closed {
 		return 0
 	}
-	used := references(s.records)
+	used := make(map[string]bool)
+	for name := range references(s.records) {
+		used[s.cipher.diskName(name)] = true
+	}
 
 	entries, err := os.ReadDir(s.blobDir)
 	if err != nil {
@@ -425,7 +461,7 @@ func (s *Store) CollectGarbage() int {
 		if e.IsDir() || referenced {
 			continue
 		}
-		if err := os.Remove(s.BlobPath(e.Name())); err == nil {
+		if err := os.Remove(filepath.Join(s.blobDir, e.Name())); err == nil {
 			n++
 		}
 	}

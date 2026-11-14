@@ -9,7 +9,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/store"
 )
 
 // TestCopySoundSetting 验证复制提示音默认开启、中英文开关即时保存及重启后保留关闭状态
@@ -17,7 +16,7 @@ func TestCopySoundSetting(t *testing.T) {
 	for _, tag := range []string{"zh-Hans", "en"} {
 		t.Run(tag, func(t *testing.T) {
 			t.Setenv("MYGO_LOCALE", tag)
-			st, err := store.Open(t.TempDir())
+			st, err := openTestStore(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -37,7 +36,7 @@ func TestCopySoundSetting(t *testing.T) {
 			if a.settings.CopySound || st.Settings().CopySound {
 				t.Fatal("关闭复制提示音未即时保存")
 			}
-			reopened, err := store.Open(st.Dir())
+			reopened, err := openTestStore(st.Dir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -59,7 +58,7 @@ func TestSettingsNavigation(t *testing.T) {
 		for _, theme := range []int{themeClassic, themeGlass} {
 			t.Run(fmt.Sprintf("%s-theme-%d", tag, theme), func(t *testing.T) {
 				t.Setenv("MYGO_LOCALE", tag)
-				st, err := store.Open(t.TempDir())
+				st, err := openTestStore(t.TempDir())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -128,7 +127,7 @@ func TestSettingsNavigation(t *testing.T) {
 				if err := tt.Click(messages.Advanced()); err != nil || !a.settings.PastePlain || !a.settings.MoveToFrontOnPaste {
 					t.Fatalf("切换分类丢失设置：%v", err)
 				}
-				reopened, err := store.Open(st.Dir())
+				reopened, err := openTestStore(st.Dir())
 				if err != nil {
 					t.Fatal(err)
 				}

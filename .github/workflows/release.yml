@@ -20,7 +20,6 @@ concurrency:
 
 env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-  CGO_ENABLED: '0'
 
 jobs:
   build:
@@ -80,8 +79,17 @@ jobs:
           security find-certificate -a -p "$keychain" > "$RUNNER_TEMP/gopaste.pem"
           sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" "$RUNNER_TEMP/gopaste.pem"
 
+      - name: 安装 Windows 静态加密库与编译器
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-openssl mingw-w64-ucrt-x86_64-pkgconf
+
       - name: 运行应用测试
-        run: go test . ./internal/...
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: tools/with-sqlcipher go test ./...
 
       - name: 构建 macOS 应用与更新包
         if: runner.os == 'macOS'
@@ -89,16 +97,20 @@ jobs:
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
           RELEASE_ARCH: ${{ matrix.arch }}
         run: |
-          go tool mygo build -platform "darwin/$RELEASE_ARCH" -o build
+          tools/with-sqlcipher go tool mygo build -platform "darwin/$RELEASE_ARCH" -o build
           app="build/darwin-$RELEASE_ARCH/GoPaste.app"
           identity=$(node -p 'require("./mygo.json").macos.signingIdentity')
-          codesign --verify --deep --strict "-R=certificate leaf = H\"$identity\"" "$app" "$app/Contents/Resources/libSqlitecore.dylib"
+          codesign --verify --deep --strict "-R=certificate leaf = H\"$identity\"" "$app"
+          if otool -L "$app/Contents/MacOS/GoPaste" | grep -Ei 'lib(ssl|crypto)'; then exit 1; fi
 
       - name: 构建 Windows Setup 与更新包
         if: runner.os == 'Windows'
         env:
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
-        run: go tool mygo build -platform windows/amd64 -o build
+        shell: msys2 {0}
+        run: |
+          tools/with-sqlcipher go tool mygo build -platform windows/amd64 -o build
+          if objdump -p build/windows-amd64/GoPaste.exe | grep -Ei 'DLL Name:.*lib(ssl|crypto)'; then exit 1; fi
 
       - name: 保存发布文件
         uses: actions/upload-artifact@v7

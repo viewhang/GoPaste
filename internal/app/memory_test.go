@@ -7,7 +7,6 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -44,7 +43,7 @@ func TestTextSummaryLimits(t *testing.T) {
 
 // TestFilterCacheChanges 验证重复绘制复用筛选结果且记录与规则变化即时生效
 func TestFilterCacheChanges(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

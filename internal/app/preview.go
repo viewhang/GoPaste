@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
@@ -94,8 +95,10 @@ func (a *App) previewBody(c *ui.Context, p palette, r *types.Record) {
 		h = barPreview
 	}
 	imagePath := ""
+	read := os.ReadFile
 	if r.Kind == types.KindImage && r.Animated && (r.ImageFormat == "gif" || r.ImageFormat == "webp") {
-		imagePath = a.st.BlobPath(r.Image)
+		imagePath = r.Image
+		read = a.st.ReadBlob
 	} else if r.Kind == types.KindFile && len(r.Files) == 1 {
 		ext := strings.ToLower(filepath.Ext(r.Files[0].Path))
 		if ext == ".gif" || ext == ".webp" {
@@ -104,7 +107,7 @@ func (a *App) previewBody(c *ui.Context, p palette, r *types.Record) {
 	}
 	if imagePath != "" {
 		body.Padding(12).Children(func() {
-			player, bitmap := a.previewImageFile(imagePath, max(w-24, h-100))
+			player, bitmap := a.previewImageFile(imagePath, max(w-24, h-100), read)
 			if player != nil {
 				ui.Video(c, player).Fill().Fit(ui.Contain).Radius(8).Label(recordTitle(r)).
 					ContextMenu(func(m *ui.Menu) { a.cardMenu(c, m, r) })

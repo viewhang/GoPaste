@@ -159,6 +159,7 @@ func (a *App) ready() {
 	st, err := store.Open(dir)
 	if err != nil {
 		mygo.Dialog.Error(locales.ReadHistoryFailed(), err.Error())
+		mygo.App.Quit()
 		return
 	}
 	a.st = st

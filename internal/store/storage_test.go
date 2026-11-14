@@ -19,7 +19,7 @@ import (
 // storageTest 创建独立临时存储并设置测试用历史容量
 func storageTest(t *testing.T, limit int) *Store {
 	t.Helper()
-	s, err := Open(t.TempDir())
+	s, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestStorageDefaultMigration(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, legacySettingsFile), []byte(`{"hotkey":"Alt+V","maxRecords":700,"retentionDays":30,"showSource":false}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open(dir)
+	s, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestStorageDefaultMigration(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(dir)
+	reopened, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestStorageSavedQuotaExemption(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestStorageLegacyDedup(t *testing.T) {
 	}}); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +243,7 @@ func TestStorageRestartDedup(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +266,7 @@ func TestStorageCommitFailure(t *testing.T) {
 	s := storageTest(t, 1)
 	r := captureTest(t, s, &types.Record{Kind: types.KindImage, Source: types.Source{AppName: "旧来源"}}, []byte("old image"), []byte("old icon"))
 	before, _ := json.Marshal(s.List())
-	if _, err := s.db.Execute(context.Background(), "PRAGMA query_only=ON"); err != nil {
+	if _, err := s.db.ExecContext(context.Background(), "PRAGMA query_only=ON"); err != nil {
 		t.Fatal(err)
 	}
 	if s.Delete(r.ID) {
@@ -290,7 +290,7 @@ func TestStorageCommitFailure(t *testing.T) {
 	if !bytes.Equal(before, after) || len(entries) != 2 || !ok || saved.Source.AppName != "旧来源" || saved.Source.Icon != r.Source.Icon {
 		t.Fatal("索引失败损坏了内存、资源或原索引")
 	}
-	if _, err := s.db.Execute(context.Background(), "PRAGMA query_only=OFF"); err != nil {
+	if _, err := s.db.ExecContext(context.Background(), "PRAGMA query_only=OFF"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -344,7 +344,7 @@ func TestStorageCorruptIndex(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, indexFile), []byte(invalid), 0600); err != nil {
 			t.Fatal(err)
 		}
-		if st, err := Open(dir); err == nil {
+		if st, err := openTestStore(dir); err == nil {
 			st.Close()
 			t.Fatal("损坏索引被当作空历史")
 		}
@@ -355,7 +355,7 @@ func TestStorageCorruptIndex(t *testing.T) {
 	if err := writeJSON(filepath.Join(dir, indexFile), index{Version: 1}); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(dir)
+	reopened, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestStorageConcurrentCommits(t *testing.T) {
 		})
 	}
 	wg.Wait()
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}

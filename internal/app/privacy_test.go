@@ -12,7 +12,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -37,7 +36,7 @@ func TestExcludedAppsSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	st, err := store.Open(dir)
+	st, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +58,7 @@ func TestExcludedAppsSettings(t *testing.T) {
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := store.Open(dir)
+	reopened, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +151,7 @@ func TestExcludedAppsSettings(t *testing.T) {
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	st, err = store.Open(dir)
+	st, err = openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +180,7 @@ func TestDefaultExcludedAppsSettings(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(`{"excludedApps":[{"id":"com.example.Custom","name":"Custom"}]}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	st, err := store.Open(dir)
+	st, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +225,7 @@ func TestDefaultExcludedAppsSettings(t *testing.T) {
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := store.Open(dir)
+	reopened, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +241,7 @@ func TestDefaultExcludedAppsSettings(t *testing.T) {
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err = store.Open(dir)
+	reopened, err = openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +257,7 @@ func TestExcludedAppsListSelection(t *testing.T) {
 		for _, dark := range []bool{false, true} {
 			t.Run(fmt.Sprintf("theme-%d-dark-%t", theme, dark), func(t *testing.T) {
 				t.Setenv("MYGO_LOCALE", "zh-Hans")
-				st, err := store.Open(t.TempDir())
+				st, err := openTestStore(t.TempDir())
 				if err != nil {
 					t.Fatal(err)
 				}

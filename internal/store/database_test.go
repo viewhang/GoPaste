@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/egoist/mygo/plugins/sqlite"
-
 	"gopaste/internal/types"
 )
 
@@ -23,7 +21,7 @@ func TestDatabaseMigrationAndSummaries(t *testing.T) {
 	if err := writeJSON(filepath.Join(dir, indexFile), index{Version: 1, Records: []*types.Record{record, files}}); err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open(dir)
+	s, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +79,7 @@ func TestDatabaseMigrationAndSummaries(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(dir)
+	reopened, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +108,7 @@ func TestPendingPreviewRecovery(t *testing.T) {
 	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(s.Dir())
+	reopened, err := openTestStore(s.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +153,7 @@ func TestDatabaseTransactionRollback(t *testing.T) {
 	if err := s.SetSettings(settings); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Execute(context.Background(), `CREATE TRIGGER reject_delete BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT,'test rejection'); END`); err != nil {
+	if _, err := s.db.ExecContext(context.Background(), `CREATE TRIGGER reject_delete BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT,'test rejection'); END`); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := s.Capture(&types.Record{ID: "new", Kind: types.KindText, Text: "new"}, nil, nil); err == nil {
@@ -183,13 +181,13 @@ func TestSettingsDatabaseMigration(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				s, err := Open(dir)
+				s, err := openTestStore(dir)
 				if err != nil {
 					t.Fatal(err)
 				}
 				defer s.Close()
 				captureTest(t, s, record, nil, nil)
-				if _, err := s.db.Transaction(context.Background(), []sqlite.Statement{{SQL: "DROP TABLE settings"}, {SQL: "PRAGMA user_version=1"}}); err != nil {
+				if err := transaction(s.db, []statement{{SQL: "DROP TABLE settings"}, {SQL: "PRAGMA user_version=1"}}); err != nil {
 					t.Fatal(err)
 				}
 				if err := s.Close(); err != nil {
@@ -205,7 +203,7 @@ func TestSettingsDatabaseMigration(t *testing.T) {
 			if err := writeJSON(filepath.Join(dir, legacySettingsFile), want); err != nil {
 				t.Fatal(err)
 			}
-			s, err := Open(dir)
+			s, err := openTestStore(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -218,9 +216,10 @@ func TestSettingsDatabaseMigration(t *testing.T) {
 					t.Fatalf("迁移后仍保留 %s", name)
 				}
 			}
-			rows, err := s.db.Query(context.Background(), "PRAGMA user_version")
-			if err != nil || rows.Values[0][0] != int64(2) {
-				t.Fatalf("数据库版本未更新：%v %v", rows, err)
+			var version int
+			err = s.db.QueryRow("PRAGMA user_version").Scan(&version)
+			if err != nil || version != schemaVersion {
+				t.Fatalf("数据库版本未更新：%d %v", version, err)
 			}
 			want.ExcludedApps = []types.ExcludedApp{{ID: "com.example.Editor", Name: "编辑器", Path: "/Applications/Editor.app"}}
 			want.PanelWidth, want.PanelHeight, want.BarHeight = 700, 800, 300
@@ -236,7 +235,7 @@ func TestSettingsDatabaseMigration(t *testing.T) {
 			if err := writeJSON(filepath.Join(dir, legacySettingsFile), types.DefaultSettings()); err != nil {
 				t.Fatal(err)
 			}
-			reopened, err := Open(dir)
+			reopened, err := openTestStore(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -247,8 +246,8 @@ func TestSettingsDatabaseMigration(t *testing.T) {
 			if got, ok := reopened.Get(record.ID); !ok || got.Text != record.Text || got.ListID != record.ListID {
 				t.Fatal("迁移丢失历史或列表归属")
 			}
-			if _, err := os.Stat(filepath.Join(dir, legacySettingsFile)); !os.IsNotExist(err) {
-				t.Fatal("未清理旧 JSON 设置")
+			if _, err := os.Stat(filepath.Join(dir, legacySettingsFile)); err != nil {
+				t.Fatal("不应删除迁移结束后由其他版本写入的设置")
 			}
 		})
 	}
@@ -263,7 +262,7 @@ func TestSettingsMigrationFailure(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, legacySettingsFile), []byte(`{"hotkey":`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if s, err := Open(dir); err == nil {
+	if s, err := openTestStore(dir); err == nil {
 		s.Close()
 		t.Fatal("损坏设置应终止迁移")
 	}
@@ -272,14 +271,15 @@ func TestSettingsMigrationFailure(t *testing.T) {
 			t.Fatalf("失败迁移删除了旧文件：%v", err)
 		}
 	}
-	db, err := sqlite.Open(context.Background(), filepath.Join(dir, databaseFile), sqlite.OpenOptions{})
+	v, err := newVaultCipher(make([]byte, 32))
 	if err != nil {
 		t.Fatal(err)
 	}
+	db := connectDatabase(filepath.Join(dir, databaseFile), v.database)
 	defer db.Close()
-	rows, err := db.Query(context.Background(), "PRAGMA user_version")
-	if err != nil || rows.Values[0][0] != int64(0) {
-		t.Fatalf("失败迁移提交了版本：%v %v", rows, err)
+	var version int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil || version != 0 {
+		t.Fatalf("迁移失败后版本错误：%v %d", err, version)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
@@ -287,7 +287,7 @@ func TestSettingsMigrationFailure(t *testing.T) {
 	if err := writeJSON(filepath.Join(dir, legacySettingsFile), types.DefaultSettings()); err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open(dir)
+	s, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestSettingsWriteRollback(t *testing.T) {
 				reject = `CREATE TRIGGER reject_delete BEFORE DELETE ON records BEGIN SELECT RAISE(ABORT,'test rejection'); END`
 				allow = "DROP TRIGGER reject_delete"
 			}
-			if _, err := s.db.Execute(context.Background(), reject); err != nil {
+			if _, err := s.db.ExecContext(context.Background(), reject); err != nil {
 				t.Fatal(err)
 			}
 			if err := s.SetSettings(changed); err == nil {
@@ -327,12 +327,13 @@ func TestSettingsWriteRollback(t *testing.T) {
 			if !reflect.DeepEqual(s.Settings(), before) || !reflect.DeepEqual(s.List(), records) {
 				t.Fatal("失败写入改变了设置或历史")
 			}
-			rows, err := s.db.Query(context.Background(), "SELECT data FROM settings WHERE id=1")
+			var data []byte
+			err := s.db.QueryRow("SELECT data FROM settings WHERE id=1").Scan(&data)
 			if err != nil {
 				t.Fatal(err)
 			}
 			var persisted types.Settings
-			if err := json.Unmarshal([]byte(rows.Values[0][0].(string)), &persisted); err != nil || !reflect.DeepEqual(persisted, before) {
+			if err := json.Unmarshal(data, &persisted); err != nil || !reflect.DeepEqual(persisted, before) {
 				t.Fatalf("失败写入改变数据库设置：%v", err)
 			}
 			for _, r := range records {
@@ -340,7 +341,7 @@ func TestSettingsWriteRollback(t *testing.T) {
 					t.Fatal("失败写入删除了原图")
 				}
 			}
-			if _, err := s.db.Execute(context.Background(), allow); err != nil {
+			if _, err := s.db.ExecContext(context.Background(), allow); err != nil {
 				t.Fatal(err)
 			}
 			if err := s.SetSettings(changed); err != nil {
@@ -349,7 +350,7 @@ func TestSettingsWriteRollback(t *testing.T) {
 			if err := s.Close(); err != nil {
 				t.Fatal(err)
 			}
-			reopened, err := Open(s.Dir())
+			reopened, err := openTestStore(s.Dir())
 			if err != nil {
 				t.Fatal(err)
 			}

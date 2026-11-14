@@ -14,7 +14,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"gopaste/internal/locales"
-	"gopaste/internal/store"
 )
 
 // mirrorRoundTripper 记录镜像测试中的出站请求
@@ -196,7 +195,7 @@ func TestUpdateMirrorSettings(t *testing.T) {
 	for _, tag := range []string{"zh-Hans", "en"} {
 		t.Run(tag, func(t *testing.T) {
 			t.Setenv("MYGO_LOCALE", tag)
-			st, err := store.Open(t.TempDir())
+			st, err := openTestStore(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -222,7 +221,7 @@ func TestUpdateMirrorSettings(t *testing.T) {
 			if st.Settings().UpdateMirror != "https://mirror.example/proxy" || *a.updateTransport.prefix.Load() != st.Settings().UpdateMirror {
 				t.Fatal("镜像地址未保存并立即生效")
 			}
-			reopened, err := store.Open(st.Dir())
+			reopened, err := openTestStore(st.Dir())
 			if err != nil {
 				t.Fatal(err)
 			}

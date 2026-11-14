@@ -1,3 +1,5 @@
+github.com/0xCarbon/go-sqlite3 v1.15.1 h1:jfVViKUBRaMvau068l8jhIbkf3epBBGDlw90kcc+/GM=
+github.com/0xCarbon/go-sqlite3 v1.15.1/go.mod h1:ANMAfeds95Wt2uetNKPPPenXJ6XqHK53ltmgttIvtnQ=
 github.com/ProtonMail/go-crypto v1.4.1 h1:9RfcZHqEQUvP8RzecWEUafnZVtEvrBVL9BiF67IQOfM=
 github.com/ProtonMail/go-crypto v1.4.1/go.mod h1:e1OaTyu5SYVrO9gKOEhTc+5UcXtTUa+P3uLudwcgPqo=
 github.com/cloudflare/circl v1.6.2 h1:hL7VBpHHKzrV5WTfHCaBsgx/HGbBYlgrwvNXEVDYYsQ=

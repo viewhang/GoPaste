@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -34,7 +33,7 @@ func TestLinkPreviewConcurrency(t *testing.T) {
 		fmt.Fprint(w, `<title>Example</title><meta property="og:image" content="/image">`)
 	}))
 	defer server.Close()
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +94,7 @@ func TestLinkPreviewDiscardedResults(t *testing.T) {
 			}))
 			defer server.Close()
 			defer release.Do(func() { close(gate) })
-			st, err := store.Open(t.TempDir())
+			st, err := openTestStore(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -9,14 +9,13 @@ import (
 
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
 // initTestStore 将界面测试的设置与有序记录写入临时数据库并加载摘要索引
 func initTestStore(t *testing.T, a *App) {
 	t.Helper()
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +34,7 @@ func initTestStore(t *testing.T, a *App) {
 
 // TestPagedHistoryActions 验证跨页展示、完整内容复制与预览及摘要缓存上限
 func TestPagedHistoryActions(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +85,7 @@ func TestPagedHistoryActions(t *testing.T) {
 
 // TestPagedFileTransfer 验证文件摘要仍能复制和拖出全部文件
 func TestPagedFileTransfer(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}

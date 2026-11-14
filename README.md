@@ -44,7 +44,7 @@ A clipboard manager for macOS and Windows, built with Go and [MyGo](https://gith
 GoPaste uses [MyGo](https://github.com/egoist/mygo)'s native UI:
 
 - GPU-rendered UI written in Go, with no WebView, HTML or JavaScript
-- No cgo required; the same codebase cross-compiles to macOS and Windows
+- MyGo renders the native UI. SQLCipher uses cgo for encrypted storage on macOS and Windows
 - Desktop APIs for the clipboard, tray, global shortcuts, drag and drop, and signed updates
 - UI tests and screenshot rendering that run without opening a window
 
@@ -82,7 +82,7 @@ On macOS, automatic paste requires permission in **System Settings → Privacy &
 
 Settings has five pages: General, Keyboard Shortcuts, Exclusion Rules, Advanced and About. General contains history limits and the copy sound; Advanced contains paste behavior and data management; About contains the update mirror and automatic updates.
 
-Select a record and press `Shift+Enter`, or choose **Paste As** from its context menu, to paste in a format supported by that record type. Markdown for images references local files.
+Select a record and press `Shift+Enter`, or choose **Paste As** from its context menu, to paste in a format supported by that record type. For a Markdown link or file path to an image captured from the clipboard, choose a destination when prompted. GoPaste exports the image there and pastes its path or Markdown link.
 
 | Shortcut | Action |
 | --- | --- |
@@ -100,13 +100,17 @@ Select a record and press `Shift+Enter`, or choose **Paste As** from its context
 
 Hold Command on macOS or Ctrl on Windows to show quick-paste numbers. Check for updates and configure automatic checks or installation in **Settings → About**.
 
+## History encryption
+
+GoPaste encrypts history, search data and settings with SQLCipher, and images, previews and app icons with AES-256-GCM. It creates a random key on first use and keeps it in macOS Keychain or Windows Credential Manager. The OS may ask for access. Existing history migrates automatically. To restore a backup, you need both the data directory and its original credential. The system clipboard and files you explicitly export remain readable by their recipients.
+
 ## Development
 
-Requires Go 1.27.3.
+Build on the target OS and architecture with Go 1.27.3. On macOS 13 or later, install Xcode Command Line Tools. On Windows, use an MSYS2 UCRT64 shell with the `mingw-w64-ucrt-x86_64-{gcc,openssl,pkgconf}` packages. The build script links OpenSSL statically.
 
 ```bash
-CGO_ENABLED=0 go run .
-CGO_ENABLED=0 go test ./...
+tools/with-sqlcipher go run .
+tools/with-sqlcipher go test ./...
 ```
 
 UI translations are in `internal/locales/`. After editing them, run:
@@ -120,18 +124,18 @@ go tool mygo i18n check
 
 ```bash
 # macOS Apple Silicon
-go tool mygo build -platform darwin/arm64 -o build
+tools/with-sqlcipher go tool mygo build -platform darwin/arm64 -o build
 
 # macOS Intel x64
-go tool mygo build -platform darwin/amd64 -o build
+tools/with-sqlcipher go tool mygo build -platform darwin/amd64 -o build
 
 # Windows x64
-go tool mygo build -platform windows/amd64 -o build
+tools/with-sqlcipher go tool mygo build -platform windows/amd64 -o build
 ```
 
 Binaries, installers and update files are written to `build/<platform>-<architecture>/`.
 
-On a Mac, these commands build a DMG with the configured local certificate. For personal builds or sharing with people you trust, use `-sign -` if you do not have that certificate. For example, `go tool mygo build -sign -` builds an ad hoc signed app for the current Mac in a DMG. To also generate signed update archives, provide the MyGo update key via `MYGO_UPDATER_PRIVATE_KEY` or set `updates.privateKey` to a local key file.
+On a Mac, these commands build a DMG with the configured local certificate. For personal builds or sharing with people you trust, use `-sign -` if you do not have that certificate. For example, `tools/with-sqlcipher go tool mygo build -sign -` builds an ad hoc signed app for the current Mac in a DMG. To also generate signed update archives, provide the MyGo update key via `MYGO_UPDATER_PRIVATE_KEY` or set `updates.privateKey` to a local key file.
 
 Official releases use the [Release workflow](.github/workflows/release.yml). Update `version` in `mygo.json`, commit it, then push the matching tag. Replace `<version>` below with the committed version:
 
@@ -143,5 +147,3 @@ git push origin main "v<version>"
 The workflow tests and builds macOS arm64, macOS amd64 and Windows amd64, creates the GitHub Release, and uploads macOS disk images, the Windows installer, update archives and manifests. MyGo also generates delta updates when a previous version is available and the patch is smaller than the full archive.
 
 The repository needs three Actions secrets: `MACOS_CERTIFICATE_P12`, `MACOS_CERTIFICATE_PASSWORD` and `MYGO_UPDATER_PRIVATE_KEY`. macOS packages use a local signing certificate and are not notarized by Apple.
-
-The local certificate has no Apple Team ID. `macos.entitlements` disables library validation so the app can load its bundled, signed SQLite library. Remove this exception if both are signed with the same Developer ID.

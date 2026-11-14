@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# 为测试和 MyGo 构建配置与目标架构匹配的静态 OpenSSL
+set -eu
+root=$(cd "$(dirname "$0")/.." && pwd)
+target_os=${GOOS:-$(go env GOHOSTOS)}
+arch=${GOARCH:-$(go env GOHOSTARCH)}
+cache="$root/.mygo/sqlcipher/$target_os-$arch"
+mkdir -p "$cache"
+
+case "$target_os" in
+  darwin)
+    version=3.5.9
+    sha=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
+    src="$root/.mygo/openssl-source"
+    lib="$cache/$version-macos13"
+    case "$arch" in
+      arm64) target=darwin64-arm64-cc; cpu=arm64 ;;
+      amd64) target=darwin64-x86_64-cc; cpu=x86_64 ;;
+      *) exit 1 ;;
+    esac
+    export MACOSX_DEPLOYMENT_TARGET=13.0
+    if [[ ! -f "$lib/.built" ]]; then
+      mkdir -p "$src" "$lib"
+      tarball="$src/openssl-$version.tar.gz"
+      if [[ ! -f "$tarball" ]]; then
+        curl -fsSL "https://github.com/openssl/openssl/releases/download/openssl-$version/openssl-$version.tar.gz" -o "$tarball.part"
+        mv "$tarball.part" "$tarball"
+      fi
+      printf '%s  %s\n' "$sha" "$tarball" | shasum -a 256 -c - >&2
+      tar -xzf "$tarball" -C "$src"
+      (cd "$lib" && "$src/openssl-$version/Configure" "$target" no-shared no-tests no-module no-engine -mmacosx-version-min=13.0 && make -s -j4 build_generated && make -s -j4 libcrypto.a)
+      touch "$lib/.built"
+    fi
+    export CGO_CFLAGS="-arch $cpu -mmacosx-version-min=13.0 \"-I$lib/include\" \"-I$src/openssl-$version/include\""
+    export CGO_LDFLAGS="-arch $cpu -mmacosx-version-min=13.0 \"-L$lib\""
+    ;;
+  linux|windows)
+    # 仅向链接器暴露静态加密库，安装包不依赖系统的 OpenSSL 动态库
+    libdir=$(pkg-config --variable=libdir libcrypto)
+    cp "$libdir/libcrypto.a" "$cache/libcrypto.a"
+    deps=$(pkg-config --static --libs-only-l --libs-only-other libcrypto)
+    if [[ "$target_os" == windows ]]; then
+      cache=$(cygpath -m "$cache")
+      inc=$(cygpath -m "$(pkg-config --variable=includedir libcrypto)")
+      export CC=gcc
+      export CGO_CFLAGS="\"-I$inc\""
+    else
+      export CGO_CFLAGS="$(pkg-config --cflags libcrypto)"
+    fi
+    export CGO_LDFLAGS="\"-L$cache\" $deps"
+    ;;
+  *) exit 1 ;;
+esac
+export CGO_ENABLED=1
+exec "$@"

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -70,7 +71,7 @@ func references(records []*types.Record) map[string]int64 {
 	return refs
 }
 
-// blobSizeLocked 读取资源实际占用，待写资源使用原始字节长度
+// blobSizeLocked 按原始字节数计算历史资源容量
 func (s *Store) blobSizeLocked(name string, pending map[string]int64) (int64, error) {
 	if n, ok := pending[name]; ok {
 		return n, nil
@@ -86,7 +87,7 @@ func (s *Store) blobSizeLocked(name string, pending map[string]int64) (int64, er
 	if err != nil {
 		return 0, err
 	}
-	return info.Size(), nil
+	return max(0, info.Size()-1-int64(s.cipher.blob.Overhead())), nil
 }
 
 // protectedLocked 汇总普通列表永久保留的资源
@@ -178,7 +179,7 @@ func (s *Store) removeUnusedLocked(candidates map[string]int64) {
 	}
 }
 
-// saveBlobLocked 以临时文件原子保存原始资源并复用已有内容
+// saveBlobLocked 认证加密资源并原子写入文件
 func (s *Store) saveBlobLocked(data []byte, name string) error {
 	path := s.BlobPath(name)
 	if path == "" {
@@ -189,13 +190,14 @@ func (s *Store) saveBlobLocked(data []byte, name string) error {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	return writeAtomic(path, data)
+	sealed := s.cipher.blob.Seal([]byte{blobVersion}, nil, data, []byte(name))
+	return writeAtomic(path, sealed)
 }
 
 // writeAtomic 将完整文件同步到临时路径后原子替换目标
 func writeAtomic(path string, data []byte) error {
 	tmp := path + ".tmp"
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -212,4 +214,49 @@ func writeAtomic(path string, data []byte) error {
 		return closeErr
 	}
 	return os.Rename(tmp, path)
+}
+
+// migrateBlobs 验证旧资源的加密副本后移除旧历史文件
+func (s *Store) migrateBlobs() error {
+	old := filepath.Join(s.dir, "blobs")
+	entries, err := os.ReadDir(old)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	refs := references(s.records)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if _, used := refs[name]; used {
+			data, err := os.ReadFile(filepath.Join(old, name))
+			if err != nil {
+				return err
+			}
+			if err := s.saveBlobLocked(data, name); err != nil {
+				return err
+			}
+			plain, err := s.ReadBlob(name)
+			if err != nil {
+				return err
+			}
+			if !slices.Equal(plain, data) {
+				return errors.New("store: migrated resource differs from original")
+			}
+		}
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			if err := os.Remove(filepath.Join(old, e.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	for _, name := range []string{indexFile, legacySettingsFile, legacyDatabaseFile, legacyDatabaseFile + "-wal", legacyDatabaseFile + "-shm", legacyDatabaseFile + "-journal"} {
+		if err := os.Remove(filepath.Join(s.dir, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }

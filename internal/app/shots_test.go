@@ -13,7 +13,6 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -170,7 +169,7 @@ func seedApp(t *testing.T) *App {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	st, err := store.Open(dir)
+	st, err := openTestStore(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

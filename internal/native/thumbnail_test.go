@@ -6,8 +6,6 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -23,16 +21,11 @@ func TestThumbnail(t *testing.T) {
 			src.SetRGBA(x, y, col)
 		}
 	}
-	path := filepath.Join(t.TempDir(), "image.png")
-	f, err := os.Create(path)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, src); err != nil {
 		t.Fatal(err)
 	}
-	if err := png.Encode(f, src); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
-	img, err := Thumbnail(path, 40)
+	img, err := Thumbnail(buf.Bytes(), 40)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +35,7 @@ func TestThumbnail(t *testing.T) {
 	if top, bottom := img.RGBAAt(20, 2), img.RGBAAt(20, 17); top.R < 250 || top.A != 255 || bottom.B < 125 || bottom.A < 125 || bottom.A > 130 {
 		t.Fatalf("缩略图方向或透明度错误：上方 %v，下方 %v", top, bottom)
 	}
-	if _, err := Thumbnail(path+".missing", 40); err == nil {
+	if _, err := Thumbnail(nil, 40); err == nil {
 		t.Fatal("缺失图片未返回错误")
 	}
 }
@@ -66,11 +59,7 @@ func TestThumbnailEXIF(t *testing.T) {
 	exif := []byte{0xff, 0xe1, 0, 34, 'E', 'x', 'i', 'f', 0, 0, 'I', 'I', 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0}
 	data := append([]byte{0xff, 0xd8}, exif...)
 	data = append(data, buf.Bytes()[2:]...)
-	path := filepath.Join(t.TempDir(), "rotated.jpg")
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	img, err := Thumbnail(path, 40)
+	img, err := Thumbnail(data, 40)
 	if err != nil {
 		t.Fatal(err)
 	}

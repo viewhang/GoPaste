@@ -6,7 +6,6 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
@@ -65,7 +64,7 @@ func TestListClickKeepsKeyboardNavigation(t *testing.T) {
 func TestManualLists(t *testing.T) {
 	for _, form := range []int{formBar, formPanel} {
 		t.Run(fmt.Sprint(form), func(t *testing.T) {
-			st, err := store.Open(t.TempDir())
+			st, err := openTestStore(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -147,7 +146,7 @@ func TestManualLists(t *testing.T) {
 			if len(a.tabs()) != 2 {
 				t.Fatal("全部入口被删除")
 			}
-			reopened, err := store.Open(st.Dir())
+			reopened, err := openTestStore(st.Dir())
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -165,7 +164,7 @@ func TestDragToManualLists(t *testing.T) {
 	for _, form := range []int{formBar, formPanel} {
 		for _, theme := range []int{themeClassic, themeGlass} {
 			t.Run(fmt.Sprintf("form-%d-theme-%d", form, theme), func(t *testing.T) {
-				st, err := store.Open(t.TempDir())
+				st, err := openTestStore(t.TempDir())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -223,7 +222,7 @@ func TestDragToManualLists(t *testing.T) {
 						t.Fatal("跨列表移动后原列表仍显示该记录")
 					}
 				}
-				reopened, err := store.Open(st.Dir())
+				reopened, err := openTestStore(st.Dir())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -245,7 +244,7 @@ func TestSmartLists(t *testing.T) {
 
 // testSmartLists 验证指定主题中的智能列表表单与匹配结果
 func testSmartLists(t *testing.T, theme int) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +328,7 @@ func testSmartLists(t *testing.T, theme int) {
 	if !a.currentTab().MatchAny || len(a.vis) != 3 {
 		t.Fatal("任意满足未收录仅符合一条规则的记录")
 	}
-	reopened, err := store.Open(st.Dir())
+	reopened, err := openTestStore(st.Dir())
 	if err != nil {
 		t.Fatal(err)
 	}

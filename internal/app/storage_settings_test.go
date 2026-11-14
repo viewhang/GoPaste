@@ -7,13 +7,12 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"gopaste/internal/store"
 	"gopaste/internal/types"
 )
 
 // TestHistoryStorageSetting 验证容量输入可见、可编辑并持久化设置
 func TestHistoryStorageSetting(t *testing.T) {
-	st, err := store.Open(t.TempDir())
+	st, err := openTestStore(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
